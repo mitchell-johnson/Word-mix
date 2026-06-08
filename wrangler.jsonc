@@ -1,7 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "word-mix",
-  "account_id": "***REMOVED***",
   "compatibility_date": "2025-05-01",
   "assets": {
     "directory": "./dist",
