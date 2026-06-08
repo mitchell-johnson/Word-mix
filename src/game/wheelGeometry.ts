@@ -1,0 +1,41 @@
+// Geometry for laying tiles on the wheel ring and hit-testing pointer positions.
+
+const RING = 0.36 // ring radius as a fraction of hub width, from center
+
+export interface RingPoint {
+  x: number // 0..1 fraction of hub width
+  y: number // 0..1 fraction of hub height
+}
+
+/** Positions for `n` tiles, first at top, clockwise. */
+export function ringPositions(n: number): RingPoint[] {
+  const pts: RingPoint[] = []
+  for (let i = 0; i < n; i++) {
+    const theta = (-90 + i * (360 / n)) * (Math.PI / 180)
+    pts.push({ x: 0.5 + RING * Math.cos(theta), y: 0.5 + RING * Math.sin(theta) })
+  }
+  return pts
+}
+
+/**
+ * Return the index of the tile under (clientX, clientY), or -1.
+ * `hubRect` is the bounding rect of the wheel hub element.
+ */
+export function hitTestTile(clientX: number, clientY: number, hubRect: DOMRect, n: number): number {
+  const pts = ringPositions(n)
+  const hitR = hubRect.width * 0.105 // generous hit radius (~tile radius)
+  let best = -1
+  let bestDist = hitR * hitR
+  for (let i = 0; i < n; i++) {
+    const cx = hubRect.left + pts[i].x * hubRect.width
+    const cy = hubRect.top + pts[i].y * hubRect.height
+    const dx = clientX - cx
+    const dy = clientY - cy
+    const d2 = dx * dx + dy * dy
+    if (d2 <= bestDist) {
+      bestDist = d2
+      best = i
+    }
+  }
+  return best
+}

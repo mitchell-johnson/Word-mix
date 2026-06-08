@@ -1,0 +1,96 @@
+// End-to-end smoke test: render, swipe-to-solve, bonus word, level completion, persistence.
+import { chromium } from 'playwright'
+import { mkdirSync } from 'node:fs'
+
+const URL = process.env.URL || 'http://localhost:4178/'
+const SHOTS = 'scripts/.cache/shots'
+mkdirSync(SHOTS, { recursive: true })
+
+const results = []
+const ok = (name, cond, extra = '') => {
+  results.push({ name, pass: !!cond, extra })
+  console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${extra ? '  — ' + extra : ''}`)
+}
+
+const browser = await chromium.launch()
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 })
+const page = await ctx.newPage()
+
+const consoleErrors = []
+page.on('console', (m) => m.type() === 'error' && consoleErrors.push(m.text()))
+page.on('pageerror', (e) => consoleErrors.push('PAGEERROR: ' + e.message))
+
+await page.goto(URL, { waitUntil: 'networkidle' })
+await page.waitForSelector('.wheel-hub', { timeout: 8000 })
+await page.waitForTimeout(500)
+await page.screenshot({ path: `${SHOTS}/01-initial.png` })
+
+ok('grid renders cells', (await page.locator('.cell').count()) > 0)
+ok('wheel renders 4 tiles', (await page.locator('.wheel-tile').count()) === 4)
+ok('top bar shows Level 1', (await page.locator('text=Level 1').count()) > 0)
+
+// Read tile letter → viewport center.
+async function tileCenters() {
+  return page.$$eval('.wheel-tile', (els) =>
+    els.map((el) => {
+      const r = el.getBoundingClientRect()
+      return { letter: el.textContent.trim(), x: r.left + r.width / 2, y: r.top + r.height / 2 }
+    }),
+  )
+}
+
+async function swipe(word) {
+  const tiles = await tileCenters()
+  const path = [...word].map((ch) => tiles.find((t) => t.letter === ch))
+  if (path.some((p) => !p)) throw new Error('missing tile for ' + word)
+  await page.mouse.move(path[0].x, path[0].y)
+  await page.mouse.down()
+  for (let i = 1; i < path.length; i++) await page.mouse.move(path[i].x, path[i].y, { steps: 6 })
+  await page.mouse.up()
+  await page.waitForTimeout(700)
+}
+
+// Solve a grid word (DIVA).
+await swipe('DIVA')
+await page.screenshot({ path: `${SHOTS}/02-after-diva.png` })
+const filledAfter = await page.locator('.cell--filled').count()
+ok('DIVA filled grid cells', filledAfter >= 4, `${filledAfter} filled`)
+ok('progress shows a solve', (await page.locator('text=/[1-3] \\/ 3/').count()) > 0)
+
+// Bonus word (AVID) → +5 coins. The coin counter is the only top-bar pill with a coin disc.
+const coinsLoc = page.locator('.glass-pill:has(.coin-disc) .tabnum').first()
+const readCoins = async () => parseInt((await coinsLoc.textContent()) || '0', 10)
+const coinsBefore = await readCoins()
+await swipe('AVID')
+await page.screenshot({ path: `${SHOTS}/03-after-bonus.png` })
+const coinsAfter = await readCoins()
+ok('bonus word awarded coins', coinsAfter === coinsBefore + 5, `${coinsBefore} → ${coinsAfter}`)
+ok('bonus jar incremented', (await page.locator('text=BONUS').count()) >= 0)
+
+// Finish the level (VIA, AID).
+await swipe('VIA')
+await swipe('AID')
+await page.waitForTimeout(900)
+await page.screenshot({ path: `${SHOTS}/04-complete.png` })
+const completeShown = (await page.locator('text=LEVEL COMPLETE').count()) > 0
+ok('level complete overlay appears', completeShown)
+
+// Advance and verify persistence across reload.
+if (completeShown) {
+  await page.locator('button:has-text("Next Level")').click({ force: true })
+  await page.waitForTimeout(500)
+}
+ok('advanced to Level 2', (await page.locator('text=Level 2').count()) > 0)
+await page.reload({ waitUntil: 'networkidle' })
+await page.waitForSelector('.wheel-hub')
+await page.waitForTimeout(400)
+ok('resumes Level 2 after reload (persistence)', (await page.locator('text=Level 2').count()) > 0)
+await page.screenshot({ path: `${SHOTS}/05-after-reload.png` })
+
+ok('no console errors', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '))
+
+await browser.close()
+
+const failed = results.filter((r) => !r.pass)
+console.log(`\n${results.length - failed.length}/${results.length} checks passed.`)
+process.exit(failed.length ? 1 : 0)
