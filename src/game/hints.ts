@@ -7,7 +7,17 @@ export function pickRevealLetterCell(
   progress: LevelProgress,
 ): { row: number; col: number; letter: string } | null {
   const solved = new Set(progress.solvedWords)
+  // A cell counts as already-visible if a letter hint OR a crossing solved word covers it —
+  // mirror buildActiveLevelState so a hint never pays to reveal an already-shown letter.
   const revealed = new Set(progress.revealedCells)
+  for (const w of level.words) {
+    if (!solved.has(w.word)) continue
+    for (let i = 0; i < w.word.length; i++) {
+      const r = w.row + (w.direction === 'down' ? i : 0)
+      const c = w.col + (w.direction === 'across' ? i : 0)
+      revealed.add(cellKey(r, c))
+    }
+  }
 
   // Prefer the shortest unsolved word so a hint makes visible progress.
   const unsolved = level.words

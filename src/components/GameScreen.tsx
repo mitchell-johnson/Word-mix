@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useActiveLevel, useReducedMotion } from '../lib/useActiveLevel'
 import { getLevel, getBonusSet } from '../data/levels'
@@ -44,6 +44,7 @@ export function GameScreen({ levelId, paused, onCompleted, onOpenMap, onOpenSett
   const [justFilled, setJustFilled] = useState<Set<string>>(new Set())
   const [toast, setToast] = useState<ToastData | null>(null)
 
+  const boardAreaRef = useRef<HTMLDivElement>(null)
   const cellRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const activeRef = useRef(active)
   activeRef.current = active
@@ -73,6 +74,17 @@ export function GameScreen({ levelId, paused, onCompleted, onOpenMap, onOpenSett
     },
     [],
   )
+
+  // Publish the board area's available height so the grid can scale cells to fit it vertically.
+  useLayoutEffect(() => {
+    const el = boardAreaRef.current
+    if (!el) return
+    const update = () => el.style.setProperty('--board-h', `${el.clientHeight}px`)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const registerCell = useCallback((key: string, el: HTMLDivElement | null) => {
     if (el) cellRefs.current.set(key, el)
@@ -224,7 +236,16 @@ export function GameScreen({ levelId, paused, onCompleted, onOpenMap, onOpenSett
               delay: i * 0.04,
             }
           })
-          if (willComplete) pendingCompleteRef.current = true
+          if (willComplete) {
+            pendingCompleteRef.current = true
+            // Watchdog: never let completion depend solely on framer-motion's onAnimationComplete
+            // (which can be skipped if the animation is interrupted). finalizeCompletion is idempotent.
+            const t = setTimeout(() => {
+              outstanding.current.clear()
+              finalizeCompletion()
+            }, 900)
+            justFillTimers.current.push(t)
+          }
           setFlights((prev) => [...prev, ...newFlights])
         }
 
@@ -306,11 +327,12 @@ export function GameScreen({ levelId, paused, onCompleted, onOpenMap, onOpenSett
         onOpenSettings={onOpenSettings}
       />
 
-      <div className="board-area">
+      <div className="board-area" ref={boardAreaRef}>
         <div className="board-plate">
           <Crossword
             grid={active.grid}
             cols={level.cols}
+            rows={level.rows}
             suppressed={suppressed}
             justFilled={justFilled}
             hintCells={hintCells}

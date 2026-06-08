@@ -6,6 +6,33 @@ import { getLevel, clampLevelId, TOTAL_LEVELS } from '../data/levels'
 import { cellKey } from '../game/grid'
 import { pickRevealLetterCell, pickRevealWordIndex } from '../game/hints'
 
+// Fault-tolerant storage: degrade to an in-memory session instead of crashing on a failed write
+// (localStorage quota, Safari private mode reporting ~0 quota, or storage disabled entirely).
+const memoryFallback = new Map<string, string>()
+const safeStorage = {
+  getItem: (name: string): string | null => {
+    try {
+      return localStorage.getItem(name)
+    } catch {
+      return memoryFallback.get(name) ?? null
+    }
+  },
+  setItem: (name: string, value: string): void => {
+    try {
+      localStorage.setItem(name, value)
+    } catch {
+      memoryFallback.set(name, value) // keep playing this session, just not persisted
+    }
+  },
+  removeItem: (name: string): void => {
+    try {
+      localStorage.removeItem(name)
+    } catch {
+      memoryFallback.delete(name)
+    }
+  },
+}
+
 function emptyProgress(): LevelProgress {
   return { solvedWords: [], bonusWordsFound: [], revealedCells: [], completed: false, hintsUsed: 0 }
 }
@@ -222,8 +249,13 @@ export const useGameStore = create<GameStore>()(
     {
       name: STORAGE_KEY,
       version: SCHEMA_VERSION,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => safeStorage),
       partialize: (s) => ({ persisted: s.persisted }),
+      // Forward-only: on a version bump, route the old blob through normalize instead of discarding
+      // it (the default behaviour when no migrate fn exists), so progress survives upgrades.
+      migrate: (persistedState) => ({
+        persisted: normalizePersisted((persistedState as { persisted?: unknown } | undefined)?.persisted ?? persistedState),
+      }),
       merge: (incoming, current) => ({
         ...current,
         persisted: normalizePersisted((incoming as { persisted?: unknown } | undefined)?.persisted),

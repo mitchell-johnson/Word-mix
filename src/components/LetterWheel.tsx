@@ -171,6 +171,7 @@ export function LetterWheel({ letters, classify, onSubmit, onShuffle, shuffleNon
           onPointerMove={onPointerMove}
           onPointerUp={(e) => finishDrag(e, true)}
           onPointerCancel={(e) => finishDrag(e, false)}
+          onLostPointerCapture={(e) => finishDrag(e, false)}
           role="application"
           aria-label="Letter wheel — swipe across letters to form a word"
         >

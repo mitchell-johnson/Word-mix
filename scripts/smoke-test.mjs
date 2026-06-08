@@ -1,6 +1,13 @@
 // End-to-end smoke test: render, swipe-to-solve, bonus word, level completion, persistence.
 import { chromium } from 'playwright'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
+
+// Data-driven so it survives level regeneration: use level 1's real words.
+const { levels } = JSON.parse(readFileSync('src/data/levels.json', 'utf8'))
+const L1 = levels[0]
+const L1_TARGETS = L1.words.map((w) => w.word.toUpperCase())
+const L1_FIRST = L1_TARGETS[0] // a grid word to solve first
+const L1_BONUS = (L1.bonusWords[0] || '').toUpperCase() // a bonus word
 
 const URL = process.env.URL || 'http://localhost:4178/'
 const SHOTS = 'scripts/.cache/shots'
@@ -26,7 +33,7 @@ await page.waitForTimeout(500)
 await page.screenshot({ path: `${SHOTS}/01-initial.png` })
 
 ok('grid renders cells', (await page.locator('.cell').count()) > 0)
-ok('wheel renders 4 tiles', (await page.locator('.wheel-tile').count()) === 4)
+ok('wheel renders all tiles', (await page.locator('.wheel-tile').count()) === L1.letters.length)
 ok('top bar shows Level 1', (await page.locator('text=Level 1').count()) > 0)
 
 // Read tile letter → viewport center.
@@ -50,26 +57,24 @@ async function swipe(word) {
   await page.waitForTimeout(700)
 }
 
-// Solve a grid word (DIVA).
-await swipe('DIVA')
-await page.screenshot({ path: `${SHOTS}/02-after-diva.png` })
+// Solve the first grid word.
+await swipe(L1_FIRST)
+await page.screenshot({ path: `${SHOTS}/02-after-solve.png` })
 const filledAfter = await page.locator('.cell--filled').count()
-ok('DIVA filled grid cells', filledAfter >= 4, `${filledAfter} filled`)
-ok('progress shows a solve', (await page.locator('text=/[1-3] \\/ 3/').count()) > 0)
+ok(`first word (${L1_FIRST}) filled grid cells`, filledAfter >= L1_FIRST.length, `${filledAfter} filled`)
+ok('progress shows a solve', (await page.locator(`text=/[1-9] \\/ ${L1_TARGETS.length}/`).count()) > 0)
 
-// Bonus word (AVID) → +5 coins. The coin counter is the only top-bar pill with a coin disc.
+// Bonus word → +5 coins. The coin counter is the only top-bar pill with a coin disc.
 const coinsLoc = page.locator('.glass-pill:has(.coin-disc) .tabnum').first()
 const readCoins = async () => parseInt((await coinsLoc.textContent()) || '0', 10)
 const coinsBefore = await readCoins()
-await swipe('AVID')
+if (L1_BONUS) await swipe(L1_BONUS)
 await page.screenshot({ path: `${SHOTS}/03-after-bonus.png` })
 const coinsAfter = await readCoins()
-ok('bonus word awarded coins', coinsAfter === coinsBefore + 5, `${coinsBefore} → ${coinsAfter}`)
-ok('bonus jar incremented', (await page.locator('text=BONUS').count()) >= 0)
+ok(`bonus word (${L1_BONUS}) awarded coins`, coinsAfter === coinsBefore + 5, `${coinsBefore} → ${coinsAfter}`)
 
-// Finish the level (VIA, AID).
-await swipe('VIA')
-await swipe('AID')
+// Finish the level — solve every remaining target.
+for (const w of L1_TARGETS) if (w !== L1_FIRST) await swipe(w)
 await page.waitForTimeout(900)
 await page.screenshot({ path: `${SHOTS}/04-complete.png` })
 const completeShown = (await page.locator('text=LEVEL COMPLETE').count()) > 0

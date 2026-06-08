@@ -22,13 +22,14 @@ const enWords = JSON.parse(readFileSync(require.resolve('an-array-of-english-wor
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
-const CACHE_DIR = join(__dirname, '.cache')
+const DATA_DIR = join(__dirname, 'data') // vendored (committed) inputs — reproducible builds
 const OUT = join(ROOT, 'src', 'data', 'levels.json')
 
-// Frequency-ordered common-word lists (tried in order). The first is ~20k words.
+// Frequency-ordered common-word lists (tried in order). The no-swears list is PRIMARY so swears
+// are never flagged "common" (and so never become targets); the larger list is a fallback only.
 const COMMON_URLS = [
-  'https://raw.githubusercontent.com/first20hours/google-10000-english/master/20k.txt',
   'https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-no-swears.txt',
+  'https://raw.githubusercontent.com/first20hours/google-10000-english/master/20k.txt',
 ]
 
 // ----------------------------------------------------------------------------------------------
@@ -73,13 +74,44 @@ const THREE_LETTER = new Set(
 // 4+ letter web-list junk we never want as a target/base.
 const SHORT_STOPLIST = new Set(['libs', 'mans', 'vids', 'apps', 'urls', 'dems', 'mems', 'recs', 'pix'])
 
-// Words we never want to surface as a target or a bonus word.
-const BLOCKLIST = new Set([
-  'ass', 'asses', 'arse', 'arses', 'butt', 'butts', 'crap', 'craps', 'damn', 'damns', 'piss', 'pisses',
-  'shit', 'shits', 'tit', 'tits', 'turd', 'turds', 'fart', 'farts', 'slut', 'sluts', 'cock', 'cocks',
-  'dick', 'dicks', 'penis', 'penises', 'fuck', 'fucks', 'cunt', 'cunts', 'twat', 'twats', 'wank', 'wanks',
-  'fag', 'fags', 'nigga', 'niggas', 'whore', 'whores', 'rape', 'rapes', 'porn', 'porns', 'sluttier',
+// Profanity filter. Applied at dictionary build so offensive words never become a base, a target,
+// OR a bonus word. Two layers: (1) substring ROOTS catch every inflection (piss→pissed, rape→raped)
+// and slurs; (2) a WHITELIST rescues benign words that merely contain a root (grape, scrape, spice,
+// cumin, sexton…). Plus an EXACT set for mild/standalone words and short slurs with no safe root.
+const PROFANE_ROOTS = [
+  'fuck', 'shit', 'piss', 'cunt', 'cock', 'dick', 'twat', 'wank', 'slut', 'whore', 'rape', 'porn',
+  'turd', 'nigg', 'spic', 'kike', 'chink', 'gook', 'dyke', 'dago', 'jizz', 'bitch', 'bastard',
+  'dildo', 'penis', 'vagina', 'scrotum', 'semen', 'molest', 'pedo', 'felch', 'smegma',
+]
+const PROFANE_WHITELIST = new Set([
+  // -rape- collisions
+  'grape', 'grapes', 'grapey', 'drape', 'drapes', 'draped', 'draper', 'drapery', 'scrape', 'scraped',
+  'scraper', 'scrapes', 'scraping', 'crape', 'crapes', 'trapes', 'parapet',
+  // -cock- collisions
+  'cockle', 'cockles', 'cocky', 'cockpit', 'peacock', 'cockade', 'cockerel', 'shuttlecock', 'cockney',
+  // -dick- collisions
+  'dickens', 'dickey', 'dickeys', 'dickie',
+  // -spic- collisions
+  'spice', 'spices', 'spiced', 'spicy', 'spicer', 'spicier', 'auspice', 'auspices', 'suspicion',
+  // -semen- / -piss- have no common benign collisions; -gook-/-coon- none short
 ])
+const PROFANE_EXACT = new Set([
+  'ass', 'asses', 'arse', 'arses', 'arsed', 'crap', 'craps', 'crappy', 'crapped', 'damn', 'damns',
+  'damned', 'damning', 'tit', 'tits', 'titty', 'titties', 'fart', 'farts', 'farted', 'fag', 'fags',
+  'faggot', 'faggots', 'sex', 'sexy', 'sexed', 'sexes', 'sexier', 'sexting', 'sext', 'sexts', 'coon',
+  'coons', 'wog', 'wogs', 'queef', 'rapey', 'boob', 'boobs', 'booby', 'knobend', 'prick', 'pricks',
+])
+const PROFANE_EXACT_WHITELIST = new Set([
+  // benign words that would be caught by an EXACT entry's intent but are fine
+  'sexton', 'unisex', 'sextet', 'sextant', 'essex', 'sussex',
+])
+
+function isProfane(w) {
+  if (PROFANE_EXACT_WHITELIST.has(w) || PROFANE_WHITELIST.has(w)) return false
+  if (PROFANE_EXACT.has(w)) return true
+  for (const root of PROFANE_ROOTS) if (w.includes(root)) return true
+  return false
+}
 
 // ----------------------------------------------------------------------------------------------
 // Seeded RNG (deterministic, reproducible level sets)
@@ -141,11 +173,12 @@ function fitsInside(wc, bc) {
 // Returns a Map word -> rank (0 = most common). The list is already frequency-ordered, so the
 // line index IS the commonness rank. Membership in this map == "a genuinely common word".
 async function loadCommonRanks() {
-  mkdirSync(CACHE_DIR, { recursive: true })
-  const cacheFile = join(CACHE_DIR, 'common.txt')
+  mkdirSync(DATA_DIR, { recursive: true })
+  const vendored = join(DATA_DIR, 'common.txt')
   let words
-  if (existsSync(cacheFile)) {
-    words = readFileSync(cacheFile, 'utf8').split('\n').filter(Boolean)
+  if (existsSync(vendored)) {
+    // Reproducible: read the committed list, no network needed.
+    words = readFileSync(vendored, 'utf8').split('\n').filter(Boolean)
   } else {
     for (const url of COMMON_URLS) {
       try {
@@ -157,7 +190,7 @@ async function loadCommonRanks() {
           .split(/\s+/)
           .map((w) => w.toLowerCase())
           .filter((w) => /^[a-z]+$/.test(w))
-        writeFileSync(cacheFile, words.join('\n'))
+        writeFileSync(vendored, words.join('\n')) // vendor for future reproducible runs
         break
       } catch {
         /* try next url */
@@ -179,7 +212,7 @@ function buildDictionary(rank) {
     const w = raw.toLowerCase()
     if (w.length < 3 || w.length > 15) continue
     if (!/^[a-z]+$/.test(w)) continue
-    if (BLOCKLIST.has(w)) continue
+    if (isProfane(w)) continue
     dict.set(w, {
       word: w,
       len: w.length,

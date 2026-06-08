@@ -3,7 +3,7 @@
 /* ---------- Layout shell ---------- */
 .app-shell {
   position: relative;
-  min-height: 100dvh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -44,12 +44,9 @@
 }
 
 /* ---------- Board plate + crossword ----------
-   Fits any grid in any screen: usable width = min(viewport, shell 480) minus shell+plate
-   padding (54px) minus inter-cell gaps ((cols-1)*4px), divided by columns, capped 20–44px. */
-:root {
-  --cell: clamp(20px, (min(100vw, 480px) - 54px - (var(--grid-cols, 7) - 1) * 4px) / var(--grid-cols, 7), 44px);
-}
-
+   Cells fit BOTH axes: the smaller of a width-derived size and a height-derived size, so tall
+   9–12 row grids never overflow the viewport and clip the wheel. --board-h is set on .board-area
+   by a ResizeObserver in GameScreen; --grid-cols/--grid-rows are injected by Crossword. */
 .board-area {
   flex: 1;
   min-height: 0;
@@ -58,6 +55,7 @@
   justify-content: center;
   width: 100%;
   padding: 8px 0;
+  overflow: auto; /* defensive: grid stays reachable even if scaling is imperfect */
 }
 
 .board-plate {
@@ -75,6 +73,9 @@
 }
 
 .crossword-grid {
+  --cell-w: clamp(16px, (min(100vw, 480px) - 54px - (var(--grid-cols, 7) - 1) * 4px) / var(--grid-cols, 7), 44px);
+  --cell-h: calc((var(--board-h, 9999px) - 46px - (var(--grid-rows, 7) - 1) * 4px) / var(--grid-rows, 7));
+  --cell: max(16px, min(var(--cell-w), var(--cell-h)));
   display: grid;
   gap: 4px;
   margin: 0 auto;
@@ -93,7 +94,7 @@
   place-items: center;
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: clamp(15px, 3.4vw, 22px);
+  font-size: calc(var(--cell) * 0.5);
   color: transparent;
   text-transform: uppercase;
 }

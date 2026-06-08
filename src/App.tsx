@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { MotionConfig } from 'framer-motion'
 import { useGameStore } from './store/gameStore'
 import { useReducedMotion } from './lib/useActiveLevel'
 import { getLevel, clampLevelId, TOTAL_LEVELS } from './data/levels'
@@ -77,9 +78,10 @@ export default function App() {
   }
 
   return (
-    <div className={reduced ? 'no-motion' : undefined}>
-      <div className={`app-bg ${themeClass}`} />
-      <Floaters themeKey={themeClass} reduced={reduced} />
+    <MotionConfig reducedMotion={reduced ? 'always' : 'user'}>
+      <div className={reduced ? 'no-motion' : undefined}>
+        <div className={`app-bg ${themeClass}`} />
+        <Floaters themeKey={themeClass} reduced={reduced} />
 
       <GameScreen
         key={viewLevelId}
@@ -126,6 +128,7 @@ export default function App() {
           onClose={() => setMapOpen(false)}
         />
       )}
-    </div>
+      </div>
+    </MotionConfig>
   )
 }
