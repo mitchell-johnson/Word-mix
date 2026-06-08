@@ -25,12 +25,17 @@ const ROOT = join(__dirname, '..')
 const DATA_DIR = join(__dirname, 'data') // vendored (committed) inputs — reproducible builds
 const OUT = join(ROOT, 'src', 'data', 'levels.json')
 
-// Frequency-ordered common-word lists (tried in order). The no-swears list is PRIMARY so swears
-// are never flagged "common" (and so never become targets); the larger list is a fallback only.
+// Frequency-ordered common-word list (~20k recognizable words). It defines the universe of words
+// the game will ever show (targets AND bonus), so even bonus words stay real/recognizable English.
+// Swears in this list are stripped separately by isProfane() at dictionary build.
 const COMMON_URLS = [
-  'https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-no-swears.txt',
   'https://raw.githubusercontent.com/first20hours/google-10000-english/master/20k.txt',
+  'https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-no-swears.txt',
 ]
+
+// Target/base words must be at least this familiar (rank in the common list). Bonus words may be
+// any recognizable word in the full list, so bonus stays plentiful but never obscure.
+const TARGET_MAX_RANK = 10000
 
 // ----------------------------------------------------------------------------------------------
 // Config
@@ -74,6 +79,31 @@ const THREE_LETTER = new Set(
 // 4+ letter web-list junk we never want as a target/base.
 const SHORT_STOPLIST = new Set(['libs', 'mans', 'vids', 'apps', 'urls', 'dems', 'mems', 'recs', 'pix'])
 
+// Proper nouns, brands, and foreign words from the web-frequency list that read as non-English.
+// (The vendored proper-nouns.txt catches many automatically; this covers the ones it misses —
+// names/places with an obscure lowercase dictionary entry, or words absent from the system dict.)
+const NON_ENGLISH = new Set(
+  (
+    // names / surnames that read as proper nouns
+    'eric lewis nelson madden yates howe lowe vera mona marc neal bach ames ariel cain alec peter ' +
+    'peters ruth tara vail carl carr bates tate tori davies fowler maria pedro noel kane kent kern ' +
+    'lang ming troy josh sith alan barry cher colin cole dino logan drake dans dyer eddy logan ' +
+    'barbie mary tony travis wang alma beth norma regina roma shaw siemens luke bailey latina ' +
+    // places / brands
+    'vegas niger hong yale brit intel mets boston brazil spain mali soho costa rio peru cuba ohio ' +
+    'utah iowa nokia sony cisco ibm asus dell sega tyne york berg ' +
+    // foreign words
+    'frau eine nach tres dolce bien sich sind und der die das ist nous anglo ' +
+    // acronyms / abbreviations / netspeak
+    'sars nato faq dept blvd inc ltd gmbh html http www jpeg mpeg usb api sql cpu gpu seo cond conn ' +
+    'recon keno roms macs huns vols mips logon sims mods ciao ' +
+    // anatomical / suggestive (keep it family-friendly)
+    'nipple nipples pantie panties nude'
+  )
+    .split(/\s+/)
+    .filter(Boolean),
+)
+
 // Profanity filter. Applied at dictionary build so offensive words never become a base, a target,
 // OR a bonus word. Two layers: (1) substring ROOTS catch every inflection (piss→pissed, rape→raped)
 // and slurs; (2) a WHITELIST rescues benign words that merely contain a root (grape, scrape, spice,
@@ -82,6 +112,7 @@ const PROFANE_ROOTS = [
   'fuck', 'shit', 'piss', 'cunt', 'cock', 'dick', 'twat', 'wank', 'slut', 'whore', 'rape', 'porn',
   'turd', 'nigg', 'spic', 'kike', 'chink', 'gook', 'dyke', 'dago', 'jizz', 'bitch', 'bastard',
   'dildo', 'penis', 'vagina', 'scrotum', 'semen', 'molest', 'pedo', 'felch', 'smegma',
+  'negro', 'clit', 'tranny', 'orgasm',
 ]
 const PROFANE_WHITELIST = new Set([
   // -rape- collisions
@@ -100,15 +131,33 @@ const PROFANE_EXACT = new Set([
   'damned', 'damning', 'tit', 'tits', 'titty', 'titties', 'fart', 'farts', 'farted', 'fag', 'fags',
   'faggot', 'faggots', 'sex', 'sexy', 'sexed', 'sexes', 'sexier', 'sexting', 'sext', 'sexts', 'coon',
   'coons', 'wog', 'wogs', 'queef', 'rapey', 'boob', 'boobs', 'booby', 'knobend', 'prick', 'pricks',
+  'homo', 'homos', 'queer', 'queers', 'boner', 'boners', 'horny', 'condom', 'condoms', 'retard',
+  'retards', 'retarded', 'spaz', 'spastic', 'midget', 'midgets', 'pube', 'pubes', 'asshole', 'assholes',
+  'butthole', 'dumbass', 'jackass', 'badass', 'smartass', 'jap', 'japs', 'wop', 'wops', 'honky',
+  'gimp', 'redneck', 'mongoloid', 'raghead', 'dykes', 'erotic', 'naked', 'nudist',
 ])
 const PROFANE_EXACT_WHITELIST = new Set([
   // benign words that would be caught by an EXACT entry's intent but are fine
   'sexton', 'unisex', 'sextet', 'sextant', 'essex', 'sussex',
 ])
 
+// Comprehensive vendored bad-words list (LDNOOBW), plus a few medical/slang terms it omits.
+const BADWORDS = (() => {
+  const s = new Set(['herpes', 'dong', 'dongs', 'milf', 'milfs'])
+  try {
+    for (const line of readFileSync(join(DATA_DIR, 'badwords.txt'), 'utf8').split('\n')) {
+      const w = line.trim()
+      if (/^[a-z]+$/.test(w)) s.add(w)
+    }
+  } catch {
+    /* optional */
+  }
+  return s
+})()
+
 function isProfane(w) {
   if (PROFANE_EXACT_WHITELIST.has(w) || PROFANE_WHITELIST.has(w)) return false
-  if (PROFANE_EXACT.has(w)) return true
+  if (PROFANE_EXACT.has(w) || BADWORDS.has(w)) return true
   for (const root of PROFANE_ROOTS) if (w.includes(root)) return true
   return false
 }
@@ -157,11 +206,10 @@ function letterMask(word) {
 
 // A word fit to be a wheel base or a grid target: common, not junk, and (if 3 letters) on the
 // curated whitelist. Bonus words are NOT held to this bar — obscure finds are part of the fun.
+// Eligible to be a wheel base or a grid target: familiar enough (rank-capped). The dictionary is
+// already pre-filtered for recognizability, the 3-letter whitelist, profanity, and junk.
 function goodWord(e) {
-  if (!e.common) return false
-  if (SHORT_STOPLIST.has(e.word)) return false
-  if (e.len <= 3) return THREE_LETTER.has(e.word)
-  return true
+  return e.rank <= TARGET_MAX_RANK
 }
 
 // True if `wc` (word counts) fits inside `bc` (base counts).
@@ -205,21 +253,28 @@ async function loadCommonRanks() {
   return rank
 }
 
-function buildDictionary(rank) {
-  // Authoritative valid words: alphabetic, length 3..15, not blocked.
+function buildDictionary(rank, exclude) {
+  // Recognizable words only: a word must be BOTH a real dictionary word (an-array-of-english-words)
+  // AND on the common-words list (rank) — this keeps obscure Scrabble/archaic fragments (eas, sae,
+  // spae, yus, arew, …) out of bonus words. 3-letter words come only from the curated whitelist.
+  // Proper nouns / brands / foreign words are excluded via `exclude`.
   const dict = new Map() // word -> { word, len, mask, counts, rank }
   for (const raw of enWords) {
     const w = raw.toLowerCase()
     if (w.length < 3 || w.length > 15) continue
     if (!/^[a-z]+$/.test(w)) continue
     if (isProfane(w)) continue
+    if (SHORT_STOPLIST.has(w)) continue
+    if (NON_ENGLISH.has(w) || exclude.has(w)) continue // proper nouns / brands / foreign
+    if (!rank.has(w)) continue // must be a recognizable, common-list word
+    if (w.length === 3 && !THREE_LETTER.has(w)) continue // only curated 3-letter words
     dict.set(w, {
       word: w,
       len: w.length,
       mask: letterMask(w),
       counts: letterCounts(w),
-      rank: rank.has(w) ? rank.get(w) : Infinity,
-      common: rank.has(w),
+      rank: rank.get(w),
+      common: true,
     })
   }
   return dict
@@ -230,10 +285,13 @@ function buildDictionary(rank) {
 // ----------------------------------------------------------------------------------------------
 
 const key = (r, c) => `${r},${c}`
+const ACROSS_BIT = 1
+const DOWN_BIT = 2
+const dirBit = (dir) => (dir === 'across' ? ACROSS_BIT : DOWN_BIT)
 
 // Find every valid placement of `word` that crosses the existing grid exactly once-or-more on
 // matching letters, never extends an existing run, and never creates a parallel adjacency.
-function findPlacements(word, cells, gridCap, bounds) {
+function findPlacements(word, cells, dirCells, gridCap, bounds) {
   const placements = []
   const len = word.length
 
@@ -245,7 +303,7 @@ function findPlacements(word, cells, gridCap, bounds) {
       for (const dir of ['across', 'down']) {
         const sr = dir === 'across' ? cr : cr - i
         const sc = dir === 'across' ? cc - i : cc
-        const p = tryPlacement(word, sr, sc, dir, cells, gridCap, bounds)
+        const p = tryPlacement(word, sr, sc, dir, cells, dirCells, gridCap, bounds)
         if (p) placements.push(p)
       }
     }
@@ -253,10 +311,11 @@ function findPlacements(word, cells, gridCap, bounds) {
   return placements
 }
 
-function tryPlacement(word, sr, sc, dir, cells, gridCap, bounds) {
+function tryPlacement(word, sr, sc, dir, cells, dirCells, gridCap, bounds) {
   const len = word.length
   const dr = dir === 'down' ? 1 : 0
   const dc = dir === 'across' ? 1 : 0
+  const bit = dirBit(dir)
 
   // Cell immediately before the start and after the end must be empty (no run extension).
   if (cells.has(key(sr - dr, sc - dc))) return null
@@ -272,6 +331,9 @@ function tryPlacement(word, sr, sc, dir, cells, gridCap, bounds) {
     const existing = cells.get(key(r, c))
     if (existing !== undefined) {
       if (existing !== word[i]) return null // mismatch
+      // A crossing must be perpendicular: if a word already runs through this cell in the SAME
+      // direction, placing here would overlap it collinearly and subsume one word into the other.
+      if ((dirCells.get(key(r, c)) || 0) & bit) return null
       intersections++
     } else {
       newCells++
@@ -302,11 +364,15 @@ function tryPlacement(word, sr, sc, dir, cells, gridCap, bounds) {
 
 function buildCrossword(base, candidates, pack, rng) {
   const cells = new Map()
+  const dirCells = new Map() // "r,c" -> bitmask of word directions through the cell
   const placed = []
   const bounds = { minR: 0, maxR: 0, minC: 0, maxC: 0 }
 
   // Place the base/pangram horizontally.
-  for (let i = 0; i < base.length; i++) cells.set(key(0, i), base[i])
+  for (let i = 0; i < base.length; i++) {
+    cells.set(key(0, i), base[i])
+    dirCells.set(key(0, i), ACROSS_BIT)
+  }
   placed.push({
     word: base,
     row: 0,
@@ -325,12 +391,17 @@ function buildCrossword(base, candidates, pack, rng) {
     changed = false
     for (const w of pool) {
       if (used.has(w)) continue
-      const options = findPlacements(w, cells, pack.gridCap, bounds)
+      const options = findPlacements(w, cells, dirCells, pack.gridCap, bounds)
       if (options.length === 0) continue
       // Keep the grid compact: smallest resulting span, then area.
       options.sort((a, b) => a.span - b.span || a.area - b.area)
       const pick = options[0]
-      pick.path.forEach((cell, i) => cells.set(key(cell.r, cell.c), w[i]))
+      const bit = dirBit(pick.dir)
+      pick.path.forEach((cell, i) => {
+        const k = key(cell.r, cell.c)
+        cells.set(k, w[i])
+        dirCells.set(k, (dirCells.get(k) || 0) | bit)
+      })
       bounds.minR = Math.min(bounds.minR, pick.row)
       bounds.maxR = Math.max(bounds.maxR, pick.row + (pick.dir === 'down' ? w.length - 1 : 0))
       bounds.minC = Math.min(bounds.minC, pick.col)
@@ -343,7 +414,32 @@ function buildCrossword(base, candidates, pack, rng) {
   }
 
   if (placed.length < pack.targetsMin) return null
+  // Safety net: every placed word must be its own maximal run, i.e. a distinct slot the player
+  // can actually fill. (Prevents the "completed but won't advance" bug from a subsumed word.)
+  const runs = maximalRuns(cells)
+  for (const p of placed) if (!runs.has(p.word)) return null
   return { placed, bounds }
+}
+
+// The set of maximal horizontal/vertical runs (length >= 2) currently in the grid.
+function maximalRuns(cells) {
+  const runs = new Set()
+  for (const [k] of cells) {
+    const [r, c] = k.split(',').map(Number)
+    if (!cells.has(key(r, c - 1)) && cells.has(key(r, c + 1))) {
+      let s = ''
+      let cc = c
+      while (cells.has(key(r, cc))) s += cells.get(key(r, cc++))
+      runs.add(s)
+    }
+    if (!cells.has(key(r - 1, c)) && cells.has(key(r + 1, c))) {
+      let s = ''
+      let rr = r
+      while (cells.has(key(rr, c))) s += cells.get(key(rr++, c))
+      runs.add(s)
+    }
+  }
+  return runs
 }
 
 // ----------------------------------------------------------------------------------------------
@@ -381,8 +477,14 @@ async function main() {
   process.stdout.write('Loading common-word ranks...\n')
   const rank = await loadCommonRanks()
   process.stdout.write(`Common words: ${rank.size}.\n`)
+  // Vendored proper-noun list (capitalized-only entries from the system dictionary).
+  const properFile = join(DATA_DIR, 'proper-nouns.txt')
+  const properNouns = existsSync(properFile)
+    ? new Set(readFileSync(properFile, 'utf8').split('\n').filter(Boolean))
+    : new Set()
+  process.stdout.write(`Proper nouns excluded: ${properNouns.size}.\n`)
   process.stdout.write('Building dictionary...\n')
-  const dict = buildDictionary(rank)
+  const dict = buildDictionary(rank, properNouns)
   process.stdout.write(`Dictionary: ${dict.size} words.\n`)
 
   // Pre-bucket strong base words by length, ordered most-common-first.

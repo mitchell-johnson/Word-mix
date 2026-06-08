@@ -68,10 +68,14 @@ ok('progress shows a solve', (await page.locator(`text=/[1-9] \\/ ${L1_TARGETS.l
 const coinsLoc = page.locator('.glass-pill:has(.coin-disc) .tabnum').first()
 const readCoins = async () => parseInt((await coinsLoc.textContent()) || '0', 10)
 const coinsBefore = await readCoins()
-if (L1_BONUS) await swipe(L1_BONUS)
-await page.screenshot({ path: `${SHOTS}/03-after-bonus.png` })
-const coinsAfter = await readCoins()
-ok(`bonus word (${L1_BONUS}) awarded coins`, coinsAfter === coinsBefore + 5, `${coinsBefore} → ${coinsAfter}`)
+if (L1_BONUS) {
+  await swipe(L1_BONUS)
+  await page.screenshot({ path: `${SHOTS}/03-after-bonus.png` })
+  const coinsAfter = await readCoins()
+  ok(`bonus word (${L1_BONUS}) awarded coins`, coinsAfter === coinsBefore + 5, `${coinsBefore} → ${coinsAfter}`)
+} else {
+  console.log('SKIP  bonus-coin check — level 1 has no bonus words')
+}
 
 // Finish the level — solve every remaining target.
 for (const w of L1_TARGETS) if (w !== L1_FIRST) await swipe(w)
