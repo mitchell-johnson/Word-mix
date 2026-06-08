@@ -426,6 +426,26 @@
   color: #fff;
 }
 
+/* Query container so banner text can size relative to the card's content
+   box (cqi), shrinking to fit on a single line instead of wrapping. Scoped
+   to the level-complete overlay so it can't affect other .glass-card users. */
+.overlay-card {
+  container-type: inline-size;
+}
+
+/* "LEVEL COMPLETE!" banner: size to the card width so it never wraps. The
+   font scales with the container inline-size (cqi), capped at 40px on wide
+   cards; nowrap forces a single line and the cqi factor keeps it in bounds. */
+.complete-banner {
+  /* Fallback for engines without container queries — must come first. */
+  font-size: clamp(24px, 7vw, 40px);
+  /* Container-relative size with ~7% slack vs the 11cqi that exactly fit,
+     so FOUT metric shift / the card's 22px padding can't cause overflow. */
+  font-size: min(40px, 10.2cqi);
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
 .gradient-text {
   background: var(--grad-candy);
   -webkit-background-clip: text;

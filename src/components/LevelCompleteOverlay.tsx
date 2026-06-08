@@ -38,7 +38,7 @@ export function LevelCompleteOverlay({ levelNumber, coinsAwarded, bonusFound, is
     <div className="scrim" onClick={onNext} role="dialog" aria-label="Level complete">
       <Confetti reduced={reduced} />
       <motion.div
-        className="glass-card"
+        className="glass-card overlay-card"
         onClick={(e) => e.stopPropagation()}
         initial={{ scale: 0.7, y: 40, opacity: 0 }}
         animate={{ scale: 1, y: 0, opacity: 1 }}
@@ -54,7 +54,7 @@ export function LevelCompleteOverlay({ levelNumber, coinsAwarded, bonusFound, is
           <div className="wax-seal">✶</div>
         </motion.div>
 
-        <h2 style={{ margin: '0 0 4px', fontSize: 'clamp(28px,8vw,40px)', lineHeight: 1.05 }}>
+        <h2 className="complete-banner" style={{ margin: '0 0 4px' }}>
           {[...BANNER].map((ch, i) => (
             <motion.span
               key={i}
