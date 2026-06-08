@@ -52,8 +52,8 @@ function BonusJar({ found, total }: { found: number; total: number }) {
 }
 
 interface Props {
-  levelId: number
-  packName: string
+  levelNumber: number
+  subtitle: string
   coins: number
   bonusFound: number
   bonusTotal: number
@@ -61,13 +61,13 @@ interface Props {
   onOpenSettings: () => void
 }
 
-export function TopBar({ levelId, packName, coins, bonusFound, bonusTotal, onOpenMap, onOpenSettings }: Props) {
+export function TopBar({ levelNumber, subtitle, coins, bonusFound, bonusTotal, onOpenMap, onOpenSettings }: Props) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 4 }}>
       <button className="glass-pill" onClick={onOpenMap} style={{ padding: '6px 14px', textAlign: 'left', color: '#fff' }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, lineHeight: 1 }}>Level {levelId}</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, lineHeight: 1 }}>Level {levelNumber}</div>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.72, marginTop: 2 }}>
-          {packName}
+          {subtitle}
         </div>
       </button>
       <div style={{ flex: 1 }} />

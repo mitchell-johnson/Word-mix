@@ -3,6 +3,7 @@
 
 import raw from './levels.json'
 import type { Level, PlacedWord, Direction } from '../types'
+import { THEME_ORDER } from '../config'
 
 interface RawWord {
   word: string
@@ -80,4 +81,51 @@ export function getBonusSet(id: number): Set<string> {
 
 export function allLevels(): Level[] {
   return LEVELS
+}
+
+// ---- Letter-mode (wheel size) navigation ----
+// Each mode is the ordered list of level ids whose wheel has exactly that many letters. Progress
+// per mode is derived from the global completed set, so switching modes never loses your place.
+
+const idsByMode = new Map<number, number[]>()
+for (const l of LEVELS) {
+  const n = l.letters.length
+  if (n >= 4 && n <= 6) {
+    if (!idsByMode.has(n)) idsByMode.set(n, [])
+    idsByMode.get(n)!.push(l.id)
+  }
+}
+for (const list of idsByMode.values()) list.sort((a, b) => a - b)
+
+export function levelsForMode(mode: number): number[] {
+  return idsByMode.get(mode) ?? []
+}
+
+export function modeLevelCount(mode: number): number {
+  return levelsForMode(mode).length
+}
+
+/** 1-based position of a level within its mode (0 if the level isn't in this mode). */
+export function modeIndexOf(mode: number, id: number): number {
+  return levelsForMode(mode).indexOf(id) + 1
+}
+
+/** First not-yet-completed level in a mode, or null if the mode is fully cleared. */
+export function firstUnsolvedInMode(mode: number, completed: Set<number>): number | null {
+  for (const id of levelsForMode(mode)) if (!completed.has(id)) return id
+  return null
+}
+
+/** The level to resume/show for a mode: first unsolved, else the last (for replay/end states). */
+export function currentLevelForMode(mode: number, completed: Set<number>): number {
+  const seq = levelsForMode(mode)
+  return firstUnsolvedInMode(mode, completed) ?? seq[seq.length - 1] ?? seq[0] ?? 1
+}
+
+/** Theme class for a position in a mode — cycles through all six themes across the mode. */
+export function themeClassForMode(mode: number, modeIndex: number): string {
+  const count = modeLevelCount(mode) || 6
+  const segment = Math.max(1, Math.ceil(count / THEME_ORDER.length))
+  const idx = Math.floor(Math.max(0, modeIndex - 1) / segment) % THEME_ORDER.length
+  return THEME_ORDER[idx]
 }

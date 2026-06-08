@@ -76,7 +76,11 @@ function normalizePersisted(raw: unknown): PersistedState {
     coins: typeof r.coins === 'number' && r.coins >= 0 ? r.coins : base.coins,
     completedLevelIds: Array.isArray(r.completedLevelIds) ? r.completedLevelIds.filter((n) => typeof n === 'number') : [],
     levelProgress: progress,
-    settings: { ...DEFAULT_SETTINGS, ...(r.settings as Settings) },
+    settings: (() => {
+      const s = { ...DEFAULT_SETTINGS, ...(r.settings ?? {}) }
+      if (s.letterMode !== 4 && s.letterMode !== 5 && s.letterMode !== 6) s.letterMode = 4
+      return s
+    })(),
     stats: { ...ZERO_STATS, ...(r.stats ?? {}) },
     createdAt: typeof r.createdAt === 'number' ? r.createdAt : base.createdAt,
     lastPlayedAt: typeof r.lastPlayedAt === 'number' ? r.lastPlayedAt : base.lastPlayedAt,

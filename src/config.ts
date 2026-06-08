@@ -1,4 +1,4 @@
-import type { Settings, LifetimeStats } from './types'
+import type { Settings, LifetimeStats, LetterMode } from './types'
 
 // Economy — constants, never persisted (retunable via app update without a save migration).
 export const ECONOMY = {
@@ -30,6 +30,30 @@ export const DEFAULT_SETTINGS: Settings = {
   haptics: true,
   reducedMotion: false,
   autoShuffle: false,
+  letterMode: 4,
+}
+
+// Selectable wheel sizes.
+export const LETTER_MODES: LetterMode[] = [4, 5, 6]
+
+// Scenic themes, in journey order. Each letter mode cycles through all six as you progress, so
+// every mode gets the full visual variety regardless of which packs its levels came from.
+export const THEME_ORDER = [
+  'theme-sunrise',
+  'theme-mint',
+  'theme-bubblegum',
+  'theme-cosmic',
+  'theme-tangerine',
+  'theme-aurora',
+] as const
+
+export const THEME_NAMES: Record<string, string> = {
+  'theme-sunrise': 'Sunrise Bay',
+  'theme-mint': 'Mint Lagoon',
+  'theme-bubblegum': 'Bubblegum Dusk',
+  'theme-cosmic': 'Cosmic Grape',
+  'theme-tangerine': 'Tangerine Reef',
+  'theme-aurora': 'Aurora Frost',
 }
 
 export const ZERO_STATS: LifetimeStats = {

@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { Confetti } from './Confetti'
 
 interface Props {
-  levelId: number
+  levelNumber: number
   coinsAwarded: number
   bonusFound: number
   isLastLevel: boolean
@@ -30,7 +30,7 @@ function useCountUp(target: number, durationMs: number, run: boolean) {
 
 const BANNER = 'LEVEL COMPLETE!'
 
-export function LevelCompleteOverlay({ levelId, coinsAwarded, bonusFound, isLastLevel, reduced, onNext }: Props) {
+export function LevelCompleteOverlay({ levelNumber, coinsAwarded, bonusFound, isLastLevel, reduced, onNext }: Props) {
   const coins = useCountUp(coinsAwarded, 800, true)
   const spring = { type: 'spring', stiffness: 320, damping: 22 } as const
 
@@ -85,7 +85,7 @@ export function LevelCompleteOverlay({ levelId, coinsAwarded, bonusFound, isLast
         </div>
 
         <p style={{ margin: '6px 0 2px', opacity: 0.82, fontWeight: 600 }}>
-          Level {levelId} cleared{bonusFound > 0 ? ` · ${bonusFound} bonus word${bonusFound === 1 ? '' : 's'}` : ''}
+          Level {levelNumber} cleared{bonusFound > 0 ? ` · ${bonusFound} bonus word${bonusFound === 1 ? '' : 's'}` : ''}
         </p>
 
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, margin: '12px 0 20px', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 26 }}>

@@ -12,6 +12,7 @@ there is no backend and nothing leaves the device.
 ## Features
 
 - **205 hand-generated levels** across 6 themed packs of rising difficulty (Meadow → Summit).
+- **Pick your wheel size** in settings — **4, 5, or 6-letter modes**, each its own progression (your place in each is remembered), cycling through all six scenic themes.
 - **Swipe letter wheel** with a glowing connector trail, live word ticket, and shuffle.
 - **Interlocking crosswords** with a satisfying fly-and-stamp animation as words land.
 - **Bonus words & coins**, **letter / word hints**, and a **progress map**.

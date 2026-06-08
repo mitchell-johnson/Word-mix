@@ -1,10 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { MotionConfig } from 'framer-motion'
 import { useGameStore } from './store/gameStore'
 import { useReducedMotion } from './lib/useActiveLevel'
-import { getLevel, clampLevelId, TOTAL_LEVELS } from './data/levels'
-import { ECONOMY, PACK_THEME, STORAGE_KEY } from './config'
-import type { Settings } from './types'
+import {
+  currentLevelForMode,
+  firstUnsolvedInMode,
+  modeIndexOf,
+  modeLevelCount,
+  themeClassForMode,
+} from './data/levels'
+import { ECONOMY, STORAGE_KEY } from './config'
+import type { LetterMode, Settings } from './types'
 import { GameScreen } from './components/GameScreen'
 import { Floaters } from './components/Floaters'
 import { LevelCompleteOverlay } from './components/LevelCompleteOverlay'
@@ -31,7 +37,6 @@ function Splash({ themeClass }: { themeClass: string }) {
 
 export default function App() {
   const hydrated = useGameStore((s) => s.hydrated)
-  const currentLevelId = useGameStore((s) => s.persisted.currentLevelId)
   const completedIds = useGameStore((s) => s.persisted.completedLevelIds)
   const coins = useGameStore((s) => s.persisted.coins)
   const settings = useGameStore((s) => s.persisted.settings)
@@ -41,15 +46,20 @@ export default function App() {
   const resetAllProgress = useGameStore((s) => s.resetAllProgress)
   const reduced = useReducedMotion()
 
+  const mode = settings.letterMode
+  const completedSet = useMemo(() => new Set(completedIds), [completedIds])
+
   const [viewLevelId, setViewLevelId] = useState<number | null>(null)
   const [completeFor, setCompleteFor] = useState<number | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [mapOpen, setMapOpen] = useState(false)
 
-  // Land on the resume level once storage hydrates.
+  // Land on (and re-derive) the resume level once hydrated and whenever the mode changes.
   useEffect(() => {
-    if (hydrated && viewLevelId === null) setViewLevelId(clampLevelId(currentLevelId))
-  }, [hydrated, viewLevelId, currentLevelId])
+    if (!hydrated) return
+    const completed = new Set(useGameStore.getState().persisted.completedLevelIds)
+    setViewLevelId(currentLevelForMode(mode, completed))
+  }, [hydrated, mode])
 
   // Multi-tab: re-hydrate when another tab writes our key.
   useEffect(() => {
@@ -64,17 +74,21 @@ export default function App() {
     return <Splash themeClass="theme-sunrise" />
   }
 
-  const themeClass = PACK_THEME[getLevel(viewLevelId)?.pack ?? 1] ?? 'theme-sunrise'
+  const themeClass = themeClassForMode(mode, modeIndexOf(mode, viewLevelId))
   const paused = completeFor !== null || settingsOpen || mapOpen
+  const completedInMode = completedIds.filter((id) => modeIndexOf(mode, id) > 0).length
 
   const handleNext = () => {
-    const finished = completeFor ?? viewLevelId
     setCompleteFor(null)
-    if (finished >= TOTAL_LEVELS) {
-      setMapOpen(true) // finished the campaign — browse the journey
-    } else {
-      setViewLevelId(clampLevelId(finished + 1))
-    }
+    const completed = new Set(useGameStore.getState().persisted.completedLevelIds)
+    const next = firstUnsolvedInMode(mode, completed)
+    if (next == null) setMapOpen(true) // mode fully cleared — browse the journey
+    else setViewLevelId(next)
+  }
+
+  const handleSetMode = (m: LetterMode) => {
+    setSetting('letterMode', m) // the mode-change effect re-points viewLevelId
+    setSettingsOpen(false)
   }
 
   return (
@@ -94,10 +108,10 @@ export default function App() {
 
       {completeFor !== null && (
         <LevelCompleteOverlay
-          levelId={completeFor}
+          levelNumber={modeIndexOf(mode, completeFor)}
           coinsAwarded={ECONOMY.coinsPerLevel}
           bonusFound={levelProgress[completeFor]?.bonusWordsFound.length ?? 0}
-          isLastLevel={completeFor >= TOTAL_LEVELS}
+          isLastLevel={modeIndexOf(mode, completeFor) >= modeLevelCount(mode)}
           reduced={reduced}
           onNext={handleNext}
         />
@@ -108,9 +122,10 @@ export default function App() {
           settings={settings}
           stats={stats}
           coins={coins}
-          completed={completedIds.length}
-          total={TOTAL_LEVELS}
+          completed={completedInMode}
+          total={modeLevelCount(mode)}
           onToggle={(k: keyof Settings) => setSetting(k, !settings[k])}
+          onSetLetterMode={handleSetMode}
           onReset={resetAllProgress}
           onClose={() => setSettingsOpen(false)}
         />
@@ -118,9 +133,9 @@ export default function App() {
 
       {mapOpen && (
         <MapOverlay
-          currentLevelId={currentLevelId}
+          mode={mode}
+          currentLevelId={currentLevelForMode(mode, completedSet)}
           completedIds={completedIds}
-          total={TOTAL_LEVELS}
           onPick={(id) => {
             setMapOpen(false)
             setViewLevelId(id)

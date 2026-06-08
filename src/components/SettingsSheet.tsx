@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import type { Settings, LifetimeStats } from '../types'
+import type { Settings, LifetimeStats, LetterMode } from '../types'
+import { LETTER_MODES } from '../config'
 
 function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
   return (
@@ -62,11 +63,12 @@ interface Props {
   completed: number
   total: number
   onToggle: <K extends keyof Settings>(k: K) => void
+  onSetLetterMode: (m: LetterMode) => void
   onReset: () => void
   onClose: () => void
 }
 
-export function SettingsSheet({ settings, stats, coins, completed, total, onToggle, onReset, onClose }: Props) {
+export function SettingsSheet({ settings, stats, coins, completed, total, onToggle, onSetLetterMode, onReset, onClose }: Props) {
   const [confirmReset, setConfirmReset] = useState(false)
   return (
     <div className="scrim" onClick={onClose} style={{ alignItems: 'flex-end' }}>
@@ -84,6 +86,35 @@ export function SettingsSheet({ settings, stats, coins, completed, total, onTogg
             Done
           </button>
         </div>
+
+        <h3 style={{ margin: '4px 0 8px', fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.7 }}>Word length</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${LETTER_MODES.length}, 1fr)`, gap: 8, marginBottom: 6 }}>
+          {LETTER_MODES.map((m) => {
+            const active = settings.letterMode === m
+            return (
+              <button
+                key={m}
+                onClick={() => onSetLetterMode(m)}
+                aria-pressed={active}
+                style={{
+                  padding: '14px 0',
+                  borderRadius: 16,
+                  fontFamily: 'var(--font-display)',
+                  fontWeight: 700,
+                  fontSize: 18,
+                  color: '#fff',
+                  background: active ? 'var(--grad-candy)' : 'rgba(255,255,255,0.1)',
+                  border: active ? '1px solid rgba(255,255,255,0.55)' : '1px solid rgba(255,255,255,0.18)',
+                  boxShadow: active ? '0 6px 18px rgba(255,77,141,0.4)' : 'none',
+                }}
+              >
+                {m}
+                <div style={{ fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 700, opacity: 0.85, letterSpacing: '0.04em' }}>LETTERS</div>
+              </button>
+            )
+          })}
+        </div>
+        <p style={{ fontSize: 11, opacity: 0.55, margin: '0 0 12px' }}>Switching length picks up where you left off in that mode.</p>
 
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)' }}>
           <Toggle on={settings.sound} onClick={() => onToggle('sound')} label="Sound effects" />

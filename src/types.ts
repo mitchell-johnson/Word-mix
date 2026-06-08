@@ -44,11 +44,15 @@ export interface ActiveLevelState {
 
 export type HintKind = 'revealLetter' | 'revealWord' | 'shuffle'
 
+/** Wheel size the player chooses: only levels with this many letters are played. */
+export type LetterMode = 4 | 5 | 6
+
 export interface Settings {
   sound: boolean
   haptics: boolean
   reducedMotion: boolean
   autoShuffle: boolean
+  letterMode: LetterMode
 }
 
 export interface LevelProgress {

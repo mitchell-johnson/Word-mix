@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useActiveLevel, useReducedMotion } from '../lib/useActiveLevel'
-import { getLevel, getBonusSet } from '../data/levels'
+import { getLevel, getBonusSet, modeIndexOf, themeClassForMode } from '../data/levels'
 import { classifyWord } from '../game/wordMatch'
 import { cellKey } from '../game/grid'
-import { ECONOMY } from '../config'
+import { ECONOMY, THEME_NAMES } from '../config'
 import { sfxValid, sfxBonus, sfxInvalid, sfxDupe, sfxHint, sfxComplete } from '../lib/sfx'
 import { buzz } from '../lib/haptics'
 import { TopBar } from './TopBar'
@@ -314,12 +314,15 @@ export function GameScreen({ levelId, paused, onCompleted, onOpenMap, onOpenSett
   const wheelLetters = wheelOrder.map((i) => level.letters[i])
   const solvedCount = active.solvedWordIndices.length
   const total = level.words.length
+  const mode = settings.letterMode
+  const levelNumber = modeIndexOf(mode, level.id)
+  const subtitle = THEME_NAMES[themeClassForMode(mode, levelNumber)] ?? level.packName
 
   return (
     <div className="app-shell">
       <TopBar
-        levelId={level.id}
-        packName={level.packName}
+        levelNumber={levelNumber}
+        subtitle={subtitle}
         coins={coins}
         bonusFound={active.foundBonusWords.length}
         bonusTotal={level.bonusWords.length}
