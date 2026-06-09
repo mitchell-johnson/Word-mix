@@ -114,7 +114,9 @@ export function SettingsSheet({ settings, stats, coins, completed, total, onTogg
             )
           })}
         </div>
-        <p style={{ fontSize: 11, opacity: 0.55, margin: '0 0 12px' }}>Switching length picks up where you left off in that mode.</p>
+        <p style={{ fontSize: 11, opacity: 0.55, margin: '0 0 12px' }}>
+          The 4-letter journey moves up to 5-letter wheels after level 10. Switching length picks up where you left off in that mode.
+        </p>
 
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)' }}>
           <Toggle on={settings.sound} onClick={() => onToggle('sound')} label="Sound effects" />

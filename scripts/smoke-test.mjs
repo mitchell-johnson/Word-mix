@@ -48,7 +48,12 @@ async function tileCenters() {
 
 async function swipe(word) {
   const tiles = await tileCenters()
-  const path = [...word].map((ch) => tiles.find((t) => t.letter === ch))
+  const used = new Set() // a repeated letter must use a different tile each time
+  const path = [...word].map((ch) => {
+    const t = tiles.find((t) => t.letter === ch && !used.has(t))
+    if (t) used.add(t)
+    return t
+  })
   if (path.some((p) => !p)) throw new Error('missing tile for ' + word)
   await page.mouse.move(path[0].x, path[0].y)
   await page.mouse.down()

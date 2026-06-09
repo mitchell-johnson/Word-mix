@@ -11,8 +11,9 @@ there is no backend and nothing leaves the device.
 
 ## Features
 
-- **205 hand-generated levels** across 6 themed packs of rising difficulty (Meadow → Summit).
+- **210 hand-generated levels**: the campaign opens with a ten-level 4-letter ramp, then moves up to 5-letter wheels automatically; consecutive levels always have ≥50% different letters.
 - **Pick your wheel size** in settings — **4, 5, or 6-letter modes**, each its own progression (your place in each is remembered), cycling through all six scenic themes.
+- **Packed crosswords**: every recognizable word the letters allow is placed in the grid where it fits (avg ~12 words per level), so finds count toward the level instead of sitting in the bonus pile.
 - **Swipe letter wheel** with a glowing connector trail, live word ticket, and shuffle.
 - **Interlocking crosswords** with a satisfying fly-and-stamp animation as words land.
 - **Bonus words & coins**, **letter / word hints**, and a **progress map**.
@@ -43,10 +44,12 @@ npm run preview      # serve the built app
 npm run gen:levels   # regenerate src/data/levels.json
 ```
 
-The generator (`scripts/generate-levels.mjs`) picks common base words, finds their common
-sub-words from a frequency-ranked whitelist (targets stay familiar), and packs them into a
-single connected crossword with strict placement rules (no run-extension, no parallel
-adjacency, every wheel letter used). It's deterministic (seeded) and validated to zero defects.
+The generator (`scripts/generate-levels.mjs`) picks common base words, finds every recognizable
+sub-word from a frequency-ranked whitelist, and packs as many as fit into a single connected
+crossword with strict placement rules (no run-extension, no parallel adjacency, every wheel
+letter used); leftovers become bonus words. Consecutive levels in every journey are guaranteed
+≥50% different letters and no two levels share a letter set. It's deterministic (seeded) and
+the constraints are verified at build time.
 
 ## Deploy
 

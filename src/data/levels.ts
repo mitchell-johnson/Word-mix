@@ -84,18 +84,28 @@ export function allLevels(): Level[] {
 }
 
 // ---- Letter-mode (wheel size) navigation ----
-// Each mode is the ordered list of level ids whose wheel has exactly that many letters. Progress
-// per mode is derived from the global completed set, so switching modes never loses your place.
+// Each mode is an ordered journey of level ids. Modes 5 and 6 contain every level of that wheel
+// size. Mode 4 — the default campaign — is a ten-level 4-letter ramp that then continues through
+// the entire 5-letter journey, so the wheel automatically grows to 5 letters after level 10.
+// Progress per mode is derived from the global completed set, so switching modes never loses
+// your place (5-letter levels cleared in the campaign count in the 5-letter journey, and vice
+// versa).
 
-const idsByMode = new Map<number, number[]>()
+const idsBySize = new Map<number, number[]>()
 for (const l of LEVELS) {
   const n = l.letters.length
   if (n >= 4 && n <= 6) {
-    if (!idsByMode.has(n)) idsByMode.set(n, [])
-    idsByMode.get(n)!.push(l.id)
+    if (!idsBySize.has(n)) idsBySize.set(n, [])
+    idsBySize.get(n)!.push(l.id)
   }
 }
-for (const list of idsByMode.values()) list.sort((a, b) => a - b)
+for (const list of idsBySize.values()) list.sort((a, b) => a - b)
+
+const idsByMode = new Map<number, number[]>([
+  [4, [...(idsBySize.get(4) ?? []), ...(idsBySize.get(5) ?? [])]],
+  [5, idsBySize.get(5) ?? []],
+  [6, idsBySize.get(6) ?? []],
+])
 
 export function levelsForMode(mode: number): number[] {
   return idsByMode.get(mode) ?? []

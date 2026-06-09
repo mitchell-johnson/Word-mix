@@ -48,6 +48,27 @@ await page.waitForSelector('.wheel-hub')
 await page.waitForTimeout(400)
 ok('chosen mode persists across reload', (await page.locator('.wheel-tile').count()) === 6)
 
+// Campaign auto-switch: with the ten-level 4-letter ramp completed, the default journey
+// continues on 5-letter wheels at level 11 (no manual mode change).
+await page.evaluate(() => {
+  const blob = {
+    state: {
+      persisted: {
+        currentLevelId: 11,
+        completedLevelIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        settings: { letterMode: 4 },
+      },
+    },
+    version: 1,
+  }
+  localStorage.setItem('wordmix:v1:state', JSON.stringify(blob))
+})
+await page.reload({ waitUntil: 'networkidle' })
+await page.waitForSelector('.wheel-hub')
+await page.waitForTimeout(400)
+ok('campaign shows Level 11 after the ramp', (await page.locator('text=Level 11').count()) > 0)
+ok('level 11 wheel grows to 5 letters', (await page.locator('.wheel-tile').count()) === 5)
+
 ok('no console errors', errs.length === 0, errs.slice(0, 3).join(' | '))
 
 await browser.close()

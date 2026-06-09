@@ -33,22 +33,36 @@ const COMMON_URLS = [
   'https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-no-swears.txt',
 ]
 
-// Target/base words must be at least this familiar (rank in the common list). Bonus words may be
-// any recognizable word in the full list, so bonus stays plentiful but never obscure.
+// Wheel BASE words must be at least this familiar (rank in the common list). Targets and bonus
+// words may be any recognizable word in the full list — never obscure, but not rank-capped.
 const TARGET_MAX_RANK = 10000
 
 // ----------------------------------------------------------------------------------------------
 // Config
 // ----------------------------------------------------------------------------------------------
 
+// Packs mirror the playable journeys (src/data/levels.ts): the 4-letter pack is a ten-level
+// ramp, after which the campaign continues on the 5-letter pack; 5/6 are also directly
+// selectable modes. Every pack uses a single wheel size so journey order == generation order.
 const PACKS = [
-  { name: 'Meadow', theme: 'meadow', baseMin: 4, baseMax: 4, targetsMin: 3, targetsMax: 5, gridCap: 7, count: 30 },
-  { name: 'Canyon', theme: 'canyon', baseMin: 4, baseMax: 5, targetsMin: 4, targetsMax: 6, gridCap: 8, count: 35 },
-  { name: 'Tide', theme: 'tide', baseMin: 5, baseMax: 5, targetsMin: 5, targetsMax: 7, gridCap: 9, count: 35 },
-  { name: 'Forest', theme: 'forest', baseMin: 5, baseMax: 6, targetsMin: 5, targetsMax: 8, gridCap: 10, count: 35 },
-  { name: 'Aurora', theme: 'aurora', baseMin: 6, baseMax: 6, targetsMin: 6, targetsMax: 9, gridCap: 11, count: 35 },
-  { name: 'Summit', theme: 'summit', baseMin: 6, baseMax: 7, targetsMin: 7, targetsMax: 10, gridCap: 12, count: 35 },
+  { name: 'Meadow', theme: 'meadow', baseLen: 4, targetsMin: 4, gridCap: 8, count: 10 },
+  { name: 'Tide', theme: 'tide', baseLen: 5, targetsMin: 6, gridCap: 10, count: 110 },
+  { name: 'Aurora', theme: 'aurora', baseLen: 6, targetsMin: 8, gridCap: 12, count: 90 },
 ]
+
+// Place as many words as the grid can hold — words go in the crossword, not the bonus pile.
+// The real bound is the gridCap; this just stops pathological cases.
+const MAX_TARGETS = 18
+
+// Consecutive levels must feel fresh: at least half of a level's letters must differ from the
+// previous level's (multiset overlap <= floor(len/2)).
+function multisetOverlap(c1, c2) {
+  let n = 0
+  for (let i = 0; i < 26; i++) n += Math.min(c1[i], c2[i])
+  return n
+}
+const tooSimilar = (prevCounts, entry) =>
+  prevCounts !== null && multisetOverlap(prevCounts, entry.counts) > Math.floor(entry.len / 2)
 
 // Curated, genuinely recognizable 3-letter words. A 3-letter word may only be a TARGET (or part
 // of a wheel base) if it is here — this surgically removes the fragment/abbreviation noise (las,
@@ -204,10 +218,10 @@ function letterMask(word) {
   return m
 }
 
-// A word fit to be a wheel base or a grid target: common, not junk, and (if 3 letters) on the
-// curated whitelist. Bonus words are NOT held to this bar — obscure finds are part of the fun.
-// Eligible to be a wheel base or a grid target: familiar enough (rank-capped). The dictionary is
-// already pre-filtered for recognizability, the 3-letter whitelist, profanity, and junk.
+// Eligible to be a wheel BASE: familiar enough (rank-capped) so the big pangram word is always
+// a genuinely common one. Targets are not rank-capped beyond dictionary membership — the dict is
+// already pre-filtered for recognizability, the 3-letter whitelist, profanity, and junk — so any
+// findable word can earn a grid slot instead of languishing as bonus.
 function goodWord(e) {
   return e.rank <= TARGET_MAX_RANK
 }
@@ -273,6 +287,7 @@ function buildDictionary(rank, exclude) {
       len: w.length,
       mask: letterMask(w),
       counts: letterCounts(w),
+      sig: w.split('').sort().join(''), // anagram signature
       rank: rank.get(w),
       common: true,
     })
@@ -387,7 +402,7 @@ function buildCrossword(base, candidates, pack, rng) {
   const pool = candidates.filter((w) => w !== base)
 
   let changed = true
-  while (placed.length < pack.targetsMax && changed) {
+  while (placed.length < MAX_TARGETS && changed) {
     changed = false
     for (const w of pool) {
       if (used.has(w)) continue
@@ -409,7 +424,7 @@ function buildCrossword(base, candidates, pack, rng) {
       placed.push({ word: w, row: pick.row, col: pick.col, dir: pick.dir, path: pick.path })
       used.add(w)
       changed = true
-      if (placed.length >= pack.targetsMax) break
+      if (placed.length >= MAX_TARGETS) break
     }
   }
 
@@ -473,6 +488,42 @@ function normalize(placed, bounds) {
   }
 }
 
+// Hard build-time guarantee on the sequences the player actually experiences (mirrors
+// src/data/levels.ts): journey 4 = the 4-letter ramp then every 5-letter level; journeys
+// 5 and 6 = every level of that wheel size, in id order. Each consecutive pair must be
+// >=50% different letters, and no two levels anywhere may share an identical letter set.
+function verifyJourneys(levels) {
+  const ofSize = (n) => levels.filter((l) => l.letters.length === n)
+  const journeys = {
+    'journey 4 (ramp→5)': [...ofSize(4), ...ofSize(5)],
+    'journey 5': ofSize(5),
+    'journey 6': ofSize(6),
+  }
+  for (const [name, seq] of Object.entries(journeys)) {
+    for (let i = 1; i < seq.length; i++) {
+      const prev = letterCounts(seq[i - 1].base)
+      const cur = letterCounts(seq[i].base)
+      const ov = multisetOverlap(prev, cur)
+      if (ov > Math.floor(seq[i].base.length / 2)) {
+        process.stdout.write(
+          `FATAL: ${name} levels ${i}->${i + 1} too similar: ${seq[i - 1].base} -> ${seq[i].base} (${ov} shared)\n`,
+        )
+        process.exit(1)
+      }
+    }
+  }
+  const sigs = new Set()
+  for (const l of levels) {
+    const sig = l.base.split('').sort().join('')
+    if (sigs.has(sig)) {
+      process.stdout.write(`FATAL: duplicate letter set ${l.base} (level ${l.id})\n`)
+      process.exit(1)
+    }
+    sigs.add(sig)
+  }
+  process.stdout.write('Journey checks passed: >=50% fresh letters between consecutive levels, no repeated letter sets.\n')
+}
+
 async function main() {
   process.stdout.write('Loading common-word ranks...\n')
   const rank = await loadCommonRanks()
@@ -497,68 +548,86 @@ async function main() {
   for (const list of basesByLen.values()) list.sort((a, b) => a.rank - b.rank)
   process.stdout.write(
     'Common bases by length: ' +
-      [4, 5, 6, 7].map((L) => `${L}:${(basesByLen.get(L) || []).length}`).join('  ') +
+      [4, 5, 6].map((L) => `${L}:${(basesByLen.get(L) || []).length}`).join('  ') +
       '\n',
   )
 
   const rng = mulberry32(0x5eed1234)
   const usedBases = new Set()
+  const usedSignatures = new Set() // sorted-letter signatures — no two levels share a letter set
+  let prevCounts = null // letter counts of the previously emitted level (= play-order predecessor)
   const levels = []
   let id = 0
 
   for (let p = 0; p < PACKS.length; p++) {
     const pack = PACKS[p]
-    // Candidate bases for this pack: in length range, shuffled with a bias toward common.
-    let pool = []
-    for (let L = pack.baseMin; L <= pack.baseMax; L++) pool = pool.concat(basesByLen.get(L) || [])
-    pool = shuffle(pool, rng)
+    const pool = shuffle(basesByLen.get(pack.baseLen) || [], rng)
+    const unbuildable = new Set() // bases that failed for prev-independent reasons; never retry
 
     let made = 0
-    let attempts = 0
-    const maxAttempts = pool.length
-    while (made < pack.count && attempts < maxAttempts) {
-      const baseEntry = pool[attempts++]
-      const base = baseEntry.word
-      if (usedBases.has(base)) continue
+    while (made < pack.count) {
+      let emitted = false
+      // Rescan the pool each level: a base skipped earlier for letter overlap with its
+      // then-predecessor may be perfectly fresh against the current one.
+      for (const baseEntry of pool) {
+        const base = baseEntry.word
+        if (usedBases.has(base) || unbuildable.has(base)) continue
+        if (usedSignatures.has(baseEntry.sig)) continue
+        if (tooSimilar(prevCounts, baseEntry)) continue
 
-      // Candidate target words: common sub-words, ordered by preference. Lower score = picked
-      // first. We favour commonness (rank) but give longer words a mild boost so a level isn't
-      // all 3-letter words.
-      const subs = subWords(baseEntry, dict, 3)
-      const score = (e) => e.rank - (e.len - 3) * 3000
-      const targetCandidates = subs
-        .filter(goodWord)
-        .sort((a, b) => score(a) - score(b))
-        .map((e) => e.word)
-      // Require headroom so we skip threadbare bases in favour of richer letter sets.
-      if (targetCandidates.length < pack.targetsMin + 1) continue
+        // Candidate target words: every recognizable sub-word, ordered by preference. Lower
+        // score = placed first. We favour commonness (rank) but give longer words a mild boost
+        // so a level isn't all 3-letter words. Anything unplaced becomes a bonus word.
+        const subs = subWords(baseEntry, dict, 3)
+        const score = (e) => e.rank - (e.len - 3) * 3000
+        const targetCandidates = subs.sort((a, b) => score(a) - score(b)).map((e) => e.word)
+        // Require headroom so we skip threadbare bases in favour of richer letter sets.
+        if (targetCandidates.length < pack.targetsMin + 1) {
+          unbuildable.add(base)
+          continue
+        }
 
-      const built = buildCrossword(base, targetCandidates, pack, rng)
-      if (!built) continue
+        const built = buildCrossword(base, targetCandidates, pack, rng)
+        if (!built) {
+          unbuildable.add(base)
+          continue
+        }
 
-      const targetSet = new Set(built.placed.map((w) => w.word))
-      // Bonus words: every valid sub-word (>=3) that is not a target.
-      const bonus = subs.map((e) => e.word).filter((w) => !targetSet.has(w))
+        const targetSet = new Set(built.placed.map((w) => w.word))
+        // Bonus words: every valid sub-word (>=3) that is not a target.
+        const bonus = subs.map((e) => e.word).filter((w) => !targetSet.has(w))
 
-      const grid = normalize(built.placed, built.bounds)
-      id++
-      levels.push({
-        id,
-        pack: p + 1,
-        packName: pack.name,
-        theme: pack.theme,
-        base,
-        letters: base.toUpperCase().split(''),
-        width: grid.width,
-        height: grid.height,
-        words: grid.words.map((w) => ({ word: w.word, row: w.row, col: w.col, dir: w.dir })),
-        bonusWords: bonus.sort(),
-      })
-      usedBases.add(base)
-      made++
+        const grid = normalize(built.placed, built.bounds)
+        id++
+        levels.push({
+          id,
+          pack: p + 1,
+          packName: pack.name,
+          theme: pack.theme,
+          base,
+          letters: base.toUpperCase().split(''),
+          width: grid.width,
+          height: grid.height,
+          words: grid.words.map((w) => ({ word: w.word, row: w.row, col: w.col, dir: w.dir })),
+          bonusWords: bonus.sort(),
+        })
+        usedBases.add(base)
+        usedSignatures.add(baseEntry.sig)
+        prevCounts = baseEntry.counts
+        made++
+        emitted = true
+        break
+      }
+      if (!emitted) break // pool exhausted under the constraints
+    }
+    if (made < pack.count) {
+      process.stdout.write(`FATAL: pack ${pack.name} exhausted its base pool at ${made}/${pack.count}.\n`)
+      process.exit(1)
     }
     process.stdout.write(`Pack ${pack.name}: ${made}/${pack.count} levels.\n`)
   }
+
+  verifyJourneys(levels)
 
   const packsMeta = PACKS.map((pk, i) => ({ id: i + 1, name: pk.name, theme: pk.theme }))
   const payload = { version: 1, generatedBy: 'generate-levels.mjs', packs: packsMeta, levels }
@@ -566,9 +635,11 @@ async function main() {
   mkdirSync(dirname(OUT), { recursive: true })
   writeFileSync(OUT, JSON.stringify(payload))
   const totalBonus = levels.reduce((n, l) => n + l.bonusWords.length, 0)
+  const targetCounts = levels.map((l) => l.words.length)
   process.stdout.write(
     `\nWrote ${levels.length} levels to ${OUT}\n` +
-      `Avg targets/level: ${(levels.reduce((n, l) => n + l.words.length, 0) / levels.length).toFixed(1)}\n` +
+      `Targets/level: avg ${(targetCounts.reduce((a, b) => a + b, 0) / levels.length).toFixed(1)}, ` +
+      `min ${Math.min(...targetCounts)}, max ${Math.max(...targetCounts)}\n` +
       `Avg bonus/level: ${(totalBonus / levels.length).toFixed(1)}\n`,
   )
 }
