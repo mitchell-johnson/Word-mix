@@ -353,12 +353,12 @@ Headings: `text-rendering: optimizeLegibility; line-height: 1.05`. All tile/tick
 
 ### 2.5 The letter wheel
 
-**Layout.** Circular glass hub anchored bottom-center, `min(64vw, 250px)` diameter. Letters sit on a ring at radius = 36% of the hub via trig:
+**Layout.** Circular glass hub anchored bottom-center, `min(64vw, 250px)` diameter. Letters sit on a ring at radius = 33% of the hub via trig (tiles are 26% wide, leaving a 4%-of-hub inset between tile edges and the wheel rim):
 
 ```
 θ = -90° + i·(360 / n)          // first letter at top
 x = 50% + R·cos(θ)
-y = 50% + R·sin(θ)              // R = 36% of hub width (RING = 0.36 in wheelGeometry.ts)
+y = 50% + R·sin(θ)              // R = 33% of hub width (RING = 0.33 in wheelGeometry.ts)
 ```
 
 Hub center holds the **Shuffle** button (circular glass, rotate-arrows icon).

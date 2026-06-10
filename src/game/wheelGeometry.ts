@@ -1,6 +1,9 @@
 // Geometry for laying tiles on the wheel ring and hit-testing pointer positions.
 
-const RING = 0.36 // ring radius as a fraction of hub width, from center
+// Ring radius as a fraction of hub width, from center. Tiles are 26% of the hub wide
+// (radius 0.13), so the rim inset is 0.5 - (RING + 0.13) = 4% of the hub (~10px at the
+// 250px hub cap) — breathing room between the tiles and the wheel edge.
+const RING = 0.33
 
 export interface RingPoint {
   x: number // 0..1 fraction of hub width
@@ -24,8 +27,9 @@ export function ringPositions(n: number): RingPoint[] {
 export function hitTestTile(clientX: number, clientY: number, hubRect: DOMRect, n: number): number {
   const pts = ringPositions(n)
   // hit radius slightly beyond the visual tile rim (tiles are 26% of hub -> radius 0.13);
-  // 0.15 adds near-miss forgiveness while staying under the 6-letter ambiguity bound (half tile pitch ~0.18)
-  const hitR = hubRect.width * 0.15
+  // 0.145 adds near-miss forgiveness while staying under the 6-letter ambiguity bound
+  // (half tile pitch = RING/2 = 0.165)
+  const hitR = hubRect.width * 0.145
   let best = -1
   let bestDist = hitR * hitR
   for (let i = 0; i < n; i++) {

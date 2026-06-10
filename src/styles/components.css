@@ -243,11 +243,11 @@
   touch-action: none;
 }
 
-/* Etched guide ring passing through the tile centers (ring radius = 36% of the hub). */
+/* Etched guide ring passing through the tile centers (ring radius = 33% of the hub). */
 .wheel-hub::before {
   content: '';
   position: absolute;
-  inset: 14%;
+  inset: 17%;
   border-radius: 50%;
   border: 1.5px dashed rgba(255, 255, 255, 0.16);
   pointer-events: none;
@@ -286,10 +286,10 @@
 }
 
 /* Glossy candy buttons: bigger glyphs on a smaller hub. Width is 26% of the hub
-   (ring radius 36% -> tiles stay clear of each other and of the hub edge even with
-   6 letters: 36 + 26/2 = 49 <= 50). The hit radius in wheelGeometry.ts is 0.15,
-   slightly larger than half this fraction, for touch forgiveness. Glyphs size in
-   cqw so they track the hub exactly. */
+   (ring radius 33% -> tiles stay clear of each other even with 6 letters, and sit a
+   4%-of-hub inset from the wheel edge: 33 + 26/2 = 46 <= 50). The hit radius in
+   wheelGeometry.ts is 0.145, slightly larger than half this fraction, for touch
+   forgiveness. Glyphs size in cqw so they track the hub exactly. */
 .wheel-tile {
   position: absolute;
   width: 26%;
