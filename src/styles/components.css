@@ -73,7 +73,7 @@
 }
 
 .crossword-grid {
-  --cell-w: clamp(16px, (min(100vw, 480px) - 54px - (var(--grid-cols, 7) - 1) * 4px) / var(--grid-cols, 7), 44px);
+  --cell-w: clamp(16px, (min(100vw, 480px) - 54px - (var(--grid-cols, 7) - 1) * 4px) / var(--grid-cols, 7), 50px);
   --cell-h: calc((var(--board-h, 9999px) - 46px - (var(--grid-rows, 7) - 1) * 4px) / var(--grid-rows, 7));
   --cell: max(16px, min(var(--cell-w), var(--cell-h)));
   display: grid;
@@ -142,11 +142,12 @@
 .word-chip {
   display: inline-flex;
   gap: 1px;
-  padding: 9px 22px;
+  padding: 8px 18px;
   border-radius: 999px;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 26px;
+  font-size: 24px;
+  line-height: 1.1;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #fff;
@@ -204,18 +205,22 @@
 }
 
 .ticket-slot {
-  height: 52px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 2px;
 }
 
+/* Compact wheel: roughly half the footprint of the old min(86vw, 340px) square, so the
+   freed height flows into .board-area (flex: 1) and tall crosswords get bigger cells.
+   The area is a size container so tile glyphs scale with the hub via cqw. */
 .wheel-area {
   position: relative;
-  width: min(86vw, 340px);
+  width: min(64vw, 250px);
   aspect-ratio: 1;
   margin: 4px auto 0;
+  container-type: inline-size;
 }
 
 .wheel-tiles {
@@ -233,8 +238,19 @@
   -webkit-backdrop-filter: blur(18px) saturate(140%);
   box-shadow:
     inset 0 1px 1px rgba(255, 255, 255, 0.4),
+    inset 0 -14px 28px color-mix(in srgb, var(--accent) 14%, transparent),
     0 -8px 40px rgba(0, 0, 0, 0.25);
   touch-action: none;
+}
+
+/* Etched guide ring passing through the tile centers (ring radius = 36% of the hub). */
+.wheel-hub::before {
+  content: '';
+  position: absolute;
+  inset: 14%;
+  border-radius: 50%;
+  border: 1.5px dashed rgba(255, 255, 255, 0.16);
+  pointer-events: none;
 }
 
 .wheel-svg {
@@ -269,9 +285,14 @@
   }
 }
 
+/* Glossy candy buttons: bigger glyphs on a smaller hub. Width is 26% of the hub
+   (ring radius 36% -> tiles stay clear of each other and of the hub edge even with
+   6 letters: 36 + 26/2 = 49 <= 50). The hit radius in wheelGeometry.ts is 0.15,
+   slightly larger than half this fraction, for touch forgiveness. Glyphs size in
+   cqw so they track the hub exactly. */
 .wheel-tile {
   position: absolute;
-  width: 17%;
+  width: 26%;
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
   border-radius: 50%;
@@ -279,15 +300,22 @@
   place-items: center;
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: clamp(20px, 6vw, 30px);
+  /* Fallback for engines without container queries — must come first. */
+  font-size: clamp(22px, 7.8vw, 31px);
+  font-size: 12.6cqw;
   color: var(--tile-ink);
   text-transform: uppercase;
-  background: linear-gradient(180deg, #ffffff 0%, #f3ecff 100%);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85); /* letterpress emboss */
+  background:
+    radial-gradient(48% 36% at 32% 22%, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0) 72%),
+    linear-gradient(180deg, #ffffff 0%, #f6efff 55%, #ecdfff 100%);
+  border: 1px solid rgba(255, 255, 255, 0.95);
   box-shadow:
     inset 0 2px 3px rgba(255, 255, 255, 0.95),
-    inset 0 -3px 6px rgba(124, 58, 237, 0.1),
-    0 6px 14px rgba(40, 16, 80, 0.28);
+    inset 0 -5px 9px rgba(124, 58, 237, 0.16),
+    0 8px 18px rgba(40, 16, 80, 0.32),
+    0 3px 12px color-mix(in srgb, var(--accent) 28%, transparent),
+    0 0 0 5px rgba(255, 255, 255, 0.07);
   transition:
     transform 0.12s var(--ease-spring),
     box-shadow 0.12s,
@@ -307,31 +335,37 @@
 
 .wheel-tile--selected {
   color: #fff;
-  background: var(--grad-candy);
-  border-color: rgba(255, 255, 255, 0.7);
-  transform: translate(-50%, -50%) scale(1.14);
+  text-shadow: 0 2px 8px rgba(110, 16, 80, 0.5);
+  background:
+    radial-gradient(50% 38% at 32% 20%, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 70%),
+    var(--grad-candy);
+  border-color: rgba(255, 255, 255, 0.85);
+  transform: translate(-50%, -50%) scale(1.12);
   box-shadow:
     inset 0 2px 4px rgba(255, 255, 255, 0.6),
-    0 8px 22px rgba(255, 77, 141, 0.55),
-    0 0 0 4px rgba(255, 255, 255, 0.22);
+    inset 0 -5px 9px rgba(90, 18, 120, 0.35),
+    0 10px 26px rgba(255, 77, 141, 0.6),
+    0 0 0 4px rgba(255, 255, 255, 0.28);
 }
 
 .shuffle-btn {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 22%;
+  width: 23%;
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   display: grid;
   place-items: center;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid var(--glass-stroke-soft);
+  color: rgba(255, 255, 255, 0.92);
+  background: radial-gradient(85% 85% at 50% 30%, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.1));
+  border: 1px solid var(--glass-stroke);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 4px 14px rgba(0, 0, 0, 0.25);
   transition: transform 0.4s var(--ease-soft);
 }
 .shuffle-btn:active {

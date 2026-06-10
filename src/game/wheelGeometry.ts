@@ -23,7 +23,9 @@ export function ringPositions(n: number): RingPoint[] {
  */
 export function hitTestTile(clientX: number, clientY: number, hubRect: DOMRect, n: number): number {
   const pts = ringPositions(n)
-  const hitR = hubRect.width * 0.105 // generous hit radius (~tile radius)
+  // hit radius slightly beyond the visual tile rim (tiles are 26% of hub -> radius 0.13);
+  // 0.15 adds near-miss forgiveness while staying under the 6-letter ambiguity bound (half tile pitch ~0.18)
+  const hitR = hubRect.width * 0.15
   let best = -1
   let bestDist = hitR * hitR
   for (let i = 0; i < n; i++) {

@@ -85,7 +85,7 @@ export const ECONOMY = {
 ### 1.6 Accessibility & motion
 
 - **`prefers-reduced-motion`** (or the explicit Settings toggle) disables confetti, ambient floaters, fly-arcs, and breathing animations; functional state changes still occur via 150 ms fades.
-- Tap targets ≥ 44px. Wheel tiles are 64px (56px on screens < 360px).
+- Tap targets ≥ 44px. Wheel tiles are 26% of the hub (≈65px at the 250px hub cap, ≈53px on a 320px screen; still ≥ 44px tap target).
 - All text meets ≥ 4.5:1 contrast (white on scenic gradients; deep-violet ink on light tiles/cards — see §2).
 - Haptics (`navigator.vibrate`) are best-effort and gated by the `haptics` setting.
 
@@ -249,8 +249,8 @@ Two Google Fonts. **Fredoka** (rounded, chunky) for display/letters/numbers; **P
 
 | Use | Font | Weight | Size (mobile) | Tracking | Notes |
 |---|---|---|---|---|---|
-| Letter tiles (wheel & grid) | Fredoka | 600 | clamp 22–30px | 0.01em | Uppercase, the star |
-| Word-preview ticket | Fredoka | 700 | 28px | 0.12em | Uppercase, wide |
+| Letter tiles (wheel & grid) | Fredoka | 600 | 12.6cqw (≈22–31px) | 0.01em | Uppercase, the star |
+| Word-preview ticket | Fredoka | 700 | 24px | 0.1em | Uppercase, wide |
 | Level title / "Level 24" | Fredoka | 700 | 22px | 0 | On glass pill |
 | Coin / score numbers | Fredoka | 600 | 18px | 0 | `font-variant-numeric: tabular-nums` |
 | "LEVEL COMPLETE!" banner | Fredoka | 700 | clamp 34–48px | 0.02em | Gradient-clipped (`--grad-candy`) |
@@ -266,30 +266,38 @@ Headings: `text-rendering: optimizeLegibility; line-height: 1.05`. All tile/tick
 
 ```css
 .wheel-tile {
-  width: 64px; height: 64px;            /* 56px on <360px screens */
+  width: 26%; aspect-ratio: 1;          /* 26% of the hub — ≈65px at the 250px cap */
   border-radius: 50%;
   display: grid; place-items: center;
-  font-family: var(--font-display); font-weight: 600; font-size: 28px;
+  font-family: var(--font-display); font-weight: 600; font-size: 12.6cqw;
   color: var(--tile-ink); text-transform: uppercase;
-  background: linear-gradient(180deg, #FFFFFF 0%, #F3ECFF 100%);
-  border: 1px solid rgba(255,255,255,0.9);
+  text-shadow: 0 1px 0 rgba(255,255,255,0.85);   /* letterpress emboss */
+  background:
+    radial-gradient(48% 36% at 32% 22%, rgba(255,255,255,1), rgba(255,255,255,0) 72%),
+    linear-gradient(180deg, #FFFFFF 0%, #F6EFFF 55%, #ECDFFF 100%);
+  border: 1px solid rgba(255,255,255,0.95);
   box-shadow:
-    inset 0 2px 3px rgba(255,255,255,0.95),     /* top gloss */
-    inset 0 -3px 6px rgba(124,58,237,0.10),      /* bottom inner shade */
-    0 6px 14px rgba(40,16,80,0.28),              /* drop */
-    0 0 0 6px rgba(255,255,255,0.06);            /* faint halo on glass */
+    inset 0 2px 3px rgba(255,255,255,0.95),      /* top gloss */
+    inset 0 -5px 9px rgba(124,58,237,0.16),      /* candy inner shade */
+    0 8px 18px rgba(40,16,80,0.32),              /* drop */
+    0 3px 12px color-mix(in srgb, var(--accent) 28%, transparent),  /* accent glow */
+    0 0 0 5px rgba(255,255,255,0.07);            /* faint halo on glass */
   transition: transform .12s var(--ease-spring), box-shadow .12s;
   user-select: none; touch-action: none;
 }
 .wheel-tile--selected {                          /* while swiping */
   color: #fff;
-  background: var(--grad-candy);
-  border-color: rgba(255,255,255,0.7);
-  transform: scale(1.14);
+  text-shadow: 0 2px 8px rgba(110,16,80,0.5);
+  background:
+    radial-gradient(50% 38% at 32% 20%, rgba(255,255,255,0.5), rgba(255,255,255,0) 70%),
+    var(--grad-candy);
+  border-color: rgba(255,255,255,0.85);
+  transform: scale(1.12);
   box-shadow:
     inset 0 2px 4px rgba(255,255,255,0.6),
-    0 8px 22px rgba(255,77,141,0.55),            /* candy glow */
-    0 0 0 4px rgba(255,255,255,0.25);
+    inset 0 -5px 9px rgba(90,18,120,0.35),
+    0 10px 26px rgba(255,77,141,0.6),            /* candy glow */
+    0 0 0 4px rgba(255,255,255,0.28);
 }
 ```
 
@@ -329,7 +337,7 @@ Headings: `text-rendering: optimizeLegibility; line-height: 1.05`. All tile/tick
 **Responsive sizing & the board plate.** Cells auto-scale via a CSS var so any grid fits any phone:
 
 ```css
-:root { --cell: clamp(30px, (100vw - 56px) / var(--grid-cols, 7), 42px); }
+:root { --cell: clamp(30px, (100vw - 56px) / var(--grid-cols, 7), 50px); }
 
 .board-plate {                                   /* the frosted crossword plate */
   border-radius: 28px;
@@ -345,12 +353,12 @@ Headings: `text-rendering: optimizeLegibility; line-height: 1.05`. All tile/tick
 
 ### 2.5 The letter wheel
 
-**Layout.** Circular glass hub anchored bottom-center, `min(86vw, 360px)` diameter. Letters sit on a ring at radius ≈ 38% of the hub via trig:
+**Layout.** Circular glass hub anchored bottom-center, `min(64vw, 250px)` diameter. Letters sit on a ring at radius = 36% of the hub via trig:
 
 ```
 θ = -90° + i·(360 / n)          // first letter at top
 x = 50% + R·cos(θ)
-y = 50% + R·sin(θ)              // R ≈ 38% of hub radius
+y = 50% + R·sin(θ)              // R = 36% of hub width (RING = 0.36 in wheelGeometry.ts)
 ```
 
 Hub center holds the **Shuffle** button (circular glass, rotate-arrows icon).
@@ -399,9 +407,9 @@ Hub center holds the **Shuffle** button (circular glass, rotate-arrows icon).
 
 ```css
 .word-chip {
-  display: inline-flex; gap: 2px; padding: 10px 22px; border-radius: 999px;
-  font-family: var(--font-display); font-weight: 700; font-size: 28px;
-  letter-spacing: .12em; text-transform: uppercase; color: #fff;
+  display: inline-flex; gap: 1px; padding: 8px 18px; border-radius: 999px;
+  font-family: var(--font-display); font-weight: 700; font-size: 24px; line-height: 1.1;
+  letter-spacing: 0.1em; text-transform: uppercase; color: #fff;
   background: rgba(255,255,255,0.12);
   border: 1px solid var(--glass-stroke);
   backdrop-filter: blur(14px);
