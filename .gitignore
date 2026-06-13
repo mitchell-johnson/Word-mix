@@ -1,0 +1,7 @@
+node_modules
+dist
+.wrangler
+scripts/.cache
+.DS_Store
+*.local
+*.log

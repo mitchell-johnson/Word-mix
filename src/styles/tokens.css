@@ -1,0 +1,107 @@
+/* Runtime design tokens + the six scenic pack themes. Plain CSS (no Tailwind directives). */
+
+:root {
+  /* Brand */
+  --c-primary: #7c3aed;
+  --c-primary-600: #6d28d9;
+  --c-primary-glow: #a855f7;
+
+  /* Signature candy gradient — the hero move (ticket / flying letters / celebrate) */
+  --grad-candy: linear-gradient(135deg, #ff4d8d 0%, #ff6fa3 28%, #c44be6 64%, #7c3aed 100%);
+
+  /* Reward gold — CONSTANT across all themes */
+  --c-gold: #ffc53d;
+  --c-gold-deep: #f59e0b;
+  --c-gold-glow: #ffe08a;
+  --grad-gold: radial-gradient(120% 120% at 30% 25%, #ffe08a 0%, #ffc53d 55%, #f59e0b 100%);
+
+  /* Status */
+  --c-success: #2fd98b;
+  --c-success-glow: #6fffc0;
+  --c-error: #ff5c6c;
+  --c-info: #6fa8ff;
+  --c-bonus: #ffb020;
+
+  /* Glass surfaces */
+  --glass-fill: rgba(255, 255, 255, 0.14);
+  --glass-fill-2: rgba(255, 255, 255, 0.22);
+  --glass-stroke: rgba(255, 255, 255, 0.35);
+  --glass-stroke-soft: rgba(255, 255, 255, 0.18);
+  --scrim: rgba(20, 10, 40, 0.55);
+
+  /* Solid surfaces */
+  --surface-light: #ffffff;
+  --surface-raised: #fbf7ff;
+  --surface-dark: #1a1030;
+
+  /* Text */
+  --text-on-light: #2a1f4a;
+  --text-on-light-2: #6b5b8a;
+  --text-on-dark: #ffffff;
+  --text-on-dark-2: rgba(255, 255, 255, 0.72);
+  --tile-ink: #3a1f6b;
+
+  /* Per-theme accent (default sunrise) */
+  --accent: #ff9f45;
+
+  /* Easings */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Fonts */
+  --font-display: 'Fredoka', system-ui, sans-serif;
+  --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+/* ---- Scenic background themes (applied to .app-bg) ---- */
+
+.theme-sunrise {
+  --accent: #ff9f45;
+  background:
+    radial-gradient(120% 80% at 50% 8%, rgba(255, 221, 148, 0.55) 0%, rgba(255, 221, 148, 0) 55%),
+    linear-gradient(180deg, #ff8e6e 0%, #ff6fa3 38%, #8a5be2 78%, #4b3ca7 100%);
+}
+
+.theme-mint {
+  --accent: #2fd9b5;
+  background:
+    radial-gradient(110% 75% at 80% 12%, rgba(167, 255, 235, 0.5) 0%, rgba(167, 255, 235, 0) 50%),
+    linear-gradient(165deg, #34e0c4 0%, #1fb6c9 40%, #2c7fd6 72%, #2a4d9e 100%);
+}
+
+.theme-bubblegum {
+  --accent: #ff4d8d;
+  background:
+    radial-gradient(120% 85% at 50% 100%, rgba(255, 120, 200, 0.5) 0%, rgba(255, 120, 200, 0) 60%),
+    linear-gradient(180deg, #6a3ce0 0%, #b14be6 35%, #ff5fb0 70%, #ff8e6e 100%);
+}
+
+.theme-cosmic {
+  --accent: #9b8cff;
+  background:
+    radial-gradient(90% 60% at 25% 20%, rgba(123, 97, 255, 0.5) 0%, rgba(123, 97, 255, 0) 55%),
+    radial-gradient(80% 60% at 85% 75%, rgba(255, 77, 141, 0.32) 0%, rgba(255, 77, 141, 0) 60%),
+    linear-gradient(160deg, #1b1147 0%, #3a1e6e 45%, #5b2a8c 75%, #2a1454 100%);
+}
+
+.theme-tangerine {
+  --accent: #ffc400;
+  background:
+    radial-gradient(120% 70% at 70% 6%, rgba(255, 214, 120, 0.5) 0%, rgba(255, 214, 120, 0) 50%),
+    linear-gradient(175deg, #ff7a18 0%, #ff4d6d 42%, #c42bb0 74%, #6a1fa0 100%);
+}
+
+.theme-aurora {
+  --accent: #5ff0c9;
+  background:
+    radial-gradient(100% 70% at 30% 10%, rgba(95, 240, 201, 0.4) 0%, rgba(95, 240, 201, 0) 55%),
+    radial-gradient(90% 60% at 75% 30%, rgba(120, 160, 255, 0.4) 0%, rgba(120, 160, 255, 0) 55%),
+    linear-gradient(180deg, #0b2a4a 0%, #134e6f 40%, #1b7a8c 70%, #0e3b52 100%);
+}
+
+.app-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  transition: background 900ms ease-in-out;
+}
